@@ -12,7 +12,7 @@ egui = { version = "0.31.1", optional = true }
 gerber-types = { git = "https://github.com/makerpnp/gerber-types-rs.git", rev = "d93cb0d4954c39cf17f924e003b5b396aeaaafd1"}
 
 # Gerber parser (optional, see README.md)
-gerber_parser = { git = "https://github.com/makerpnp/gerber-parser.git", rev = "505676753512939cb92402a5ae91b5af692e7675", optional = true }
+gerber_parser = { git = "https://github.com/makerpnp/gerber-parser.git", rev = "5c29840f11a9d7a727c8c573cfb6728e7b3f960a", optional = true }
 
 # Math
 rand = "0.9.1"

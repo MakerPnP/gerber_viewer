@@ -1210,7 +1210,7 @@ dependencies = [
 [[package]]
 name = "gerber-types"
 version = "0.4.0"
-source = "git+https://github.com/hydra/gerber-types-rs.git?rev=d93cb0d4954c39cf17f924e003b5b396aeaaafd1#d93cb0d4954c39cf17f924e003b5b396aeaaafd1"
+source = "git+https://github.com/makerpnp/gerber-types-rs.git?rev=d93cb0d4954c39cf17f924e003b5b396aeaaafd1#d93cb0d4954c39cf17f924e003b5b396aeaaafd1"
 dependencies = [
  "chrono",
  "conv",
@@ -1222,7 +1222,7 @@ dependencies = [
 [[package]]
 name = "gerber_parser"
 version = "0.1.2"
-source = "git+https://github.com/hydra/gerber-parser.git?rev=505676753512939cb92402a5ae91b5af692e7675#505676753512939cb92402a5ae91b5af692e7675"
+source = "git+https://github.com/makerpnp/gerber-parser.git?rev=5c29840f11a9d7a727c8c573cfb6728e7b3f960a#5c29840f11a9d7a727c8c573cfb6728e7b3f960a"
 dependencies = [
  "gerber-types",
  "lazy-regex",
