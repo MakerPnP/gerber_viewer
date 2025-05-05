@@ -1,0 +1,13 @@
+[package]
+name = "gerber_viewer_demo"
+version = "0.1.0"
+edition = "2024"
+authors = ["Dominic Clifton <me@dominicclifton.name>"]
+
+[dependencies]
+egui = "0.31.1"
+eframe = "0.31.1"
+gerber_viewer = { path = "..", features = ["egui", "parser", "types"] }
+
+# delete this, it's just a cargo workspace workaround
+[workspace]

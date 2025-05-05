@@ -1,0 +1,36 @@
+[package]
+name = "gerber_viewer"
+version = "0.1.0"
+edition = "2024"
+authors = ["Dominic Clifton <me@dominicclifton.name>"]
+
+[dependencies]
+# Rendering (optional, see README.md)
+egui = { version = "0.31.1", optional = true }
+
+# Gerber files
+gerber-types = { git = "https://github.com/hydra/gerber-types-rs.git", rev = "d93cb0d4954c39cf17f924e003b5b396aeaaafd1"}
+
+# Gerber parser (optional, see README.md)
+gerber_parser = { git = "https://github.com/hydra/gerber-parser.git", rev = "505676753512939cb92402a5ae91b5af692e7675", optional = true }
+
+# Math
+rand = "0.9.1"
+lyon = "1.0"
+
+# Errors
+thiserror = "2.0.12"
+
+# Logging
+log = "0.4"
+
+[features]
+default = ["types", "parser", "egui"]
+
+# add egui rendering API
+egui = ["dep:egui"]
+
+# just adds a re-export of gerber-parser.
+parser = ["dep:gerber_parser"]
+# just adds a re-export of gerber-types, the gerber-types will still be used.
+types = []

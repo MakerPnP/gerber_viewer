@@ -1,0 +1,38 @@
+# run with `cargo +nightly fmt`
+#
+# every setting in here must be coupled with a reason for the setting
+
+
+# Suitable for RustRover at 1920x1080 with reasonably sized left and right hand side panels with a 13pt code font
+max_width = 120
+
+# it's important to clearly see method chains, and allows RustRover to embed the return type of each chain at the end
+# of the line making the code more readable
+chain_width = 40
+
+# combine this with 'autocrlf = true' in git config
+newline_style = "Native"
+
+# rustrover ide warns about this
+use_field_init_shorthand = true
+
+#
+# 'nightly' settings
+#
+
+# cleaner
+group_imports = "StdExternalCrate"
+
+# makes adding new fields harder to follow in diffs.
+struct_lit_single_line = false
+
+# reduces nesting
+overflow_delimited_expr = true
+
+# better for diffs
+trailing_comma = "Vertical"
+
+#
+# consider removing the following
+#
+merge_derives = false
