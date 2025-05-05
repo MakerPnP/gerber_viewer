@@ -207,11 +207,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "gerber-types"
+version = "0.4.0"
+source = "git+https://github.com/makerpnp/gerber-types-rs.git?rev=d93cb0d4954c39cf17f924e003b5b396aeaaafd1#d93cb0d4954c39cf17f924e003b5b396aeaaafd1"
+dependencies = [
+ "chrono",
+ "conv",
+ "num-rational",
+ "thiserror 1.0.69",
+ "uuid",
+]
+
+[[package]]
 name = "gerber_parser"
 version = "0.1.2"
-source = "git+https://github.com/hydra/gerber-parser.git?rev=505676753512939cb92402a5ae91b5af692e7675#505676753512939cb92402a5ae91b5af692e7675"
+source = "git+https://github.com/makerpnp/gerber-parser.git?rev=505676753512939cb92402a5ae91b5af692e7675#505676753512939cb92402a5ae91b5af692e7675"
 dependencies = [
- "gerber-types",
+ "gerber-types 0.4.0 (git+https://github.com/hydra/gerber-types-rs.git?rev=d93cb0d4954c39cf17f924e003b5b396aeaaafd1)",
  "lazy-regex",
  "log",
  "regex",
@@ -224,7 +236,7 @@ name = "gerber_viewer"
 version = "0.1.0"
 dependencies = [
  "egui",
- "gerber-types",
+ "gerber-types 0.4.0 (git+https://github.com/makerpnp/gerber-types-rs.git?rev=d93cb0d4954c39cf17f924e003b5b396aeaaafd1)",
  "gerber_parser",
  "log",
  "lyon",
