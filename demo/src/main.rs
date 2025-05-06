@@ -2,8 +2,7 @@ use std::io::BufReader;
 
 use eframe::emath::{Rect, Vec2};
 use eframe::epaint::Color32;
-use gerber_viewer::gerber_parser::parser::parse_gerber;
-use gerber_viewer::gerber_types::Command;
+use gerber_viewer::gerber_parser::parse;
 use gerber_viewer::{GerberLayer, GerberRenderer, ViewState};
 
 struct DemoApp {
@@ -17,12 +16,8 @@ impl DemoApp {
         let demo_str = include_str!("../assets/demo.gbr").as_bytes();
         let reader = BufReader::new(demo_str);
 
-        let doc = parse_gerber(reader);
-        let commands = doc
-            .commands
-            .into_iter()
-            .filter_map(|command_result| command_result.ok())
-            .collect::<Vec<Command>>();
+        let doc = parse(reader).unwrap();
+        let commands = doc.into_commands();
 
         let gerber_layer = GerberLayer::new(commands);
 

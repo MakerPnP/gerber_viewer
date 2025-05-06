@@ -1210,26 +1210,25 @@ dependencies = [
 [[package]]
 name = "gerber-types"
 version = "0.4.0"
-source = "git+https://github.com/makerpnp/gerber-types-rs.git?rev=d93cb0d4954c39cf17f924e003b5b396aeaaafd1#d93cb0d4954c39cf17f924e003b5b396aeaaafd1"
+source = "git+https://github.com/makerpnp/gerber-types-rs.git?rev=41b8ab178fb6ee646dfba3f000db1b1b8a9ae167#41b8ab178fb6ee646dfba3f000db1b1b8a9ae167"
 dependencies = [
  "chrono",
  "conv",
  "num-rational",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
  "uuid",
 ]
 
 [[package]]
 name = "gerber_parser"
-version = "0.1.2"
-source = "git+https://github.com/makerpnp/gerber-parser.git?rev=5c29840f11a9d7a727c8c573cfb6728e7b3f960a#5c29840f11a9d7a727c8c573cfb6728e7b3f960a"
+version = "0.2.0"
+source = "git+https://github.com/makerpnp/gerber-parser-makerpnp.git?rev=5131551a09165a7318aa29b46d621f867b319bbf#5131551a09165a7318aa29b46d621f867b319bbf"
 dependencies = [
  "gerber-types",
  "lazy-regex",
  "log",
  "regex",
- "stringreader",
- "thiserror 1.0.69",
+ "thiserror 2.0.12",
 ]
 
 [[package]]
@@ -2920,12 +2919,6 @@ name = "strict-num"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6637bab7722d379c8b41ba849228d680cc12d0a45ba1fa2b48f2a30577a06731"
-
-[[package]]
-name = "stringreader"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "913e7b03d63752f6cdd2df77da36749d82669904798fe8944b9ec3d23f159905"
 
 [[package]]
 name = "strum"
