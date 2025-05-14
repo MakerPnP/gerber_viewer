@@ -7,7 +7,12 @@ pub mod position;
 #[cfg(feature = "egui")]
 mod renderer;
 
+#[cfg(feature = "egui")]
+mod drawing;
+
 pub use color::*;
+#[cfg(feature = "egui")]
+pub use drawing::*;
 pub use geometry::*;
 /// re-export 'gerber_parser' crate
 #[cfg(feature = "parser")]

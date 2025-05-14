@@ -1,114 +1,20 @@
-use std::ops::{AddAssign, DivAssign, MulAssign, SubAssign};
+use std::ops::Add;
 
 #[cfg(feature = "egui")]
-use egui::Vec2;
-
-pub const ZERO: Position = Position::new(0.0, 0.0);
-
-#[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
-pub struct Position {
-    pub x: f64,
-    pub y: f64,
-}
+use egui::{Pos2, Vec2};
 
 #[allow(dead_code)]
 impl Position {
-    pub const fn new(x: f64, y: f64) -> Self {
-        Self {
-            x,
-            y,
-        }
-    }
-
     #[cfg(feature = "egui")]
-    pub const fn to_vec2(self) -> Vec2 {
-        Vec2::new(self.x as f32, self.y as f32)
+    pub const fn to_pos2(self) -> Pos2 {
+        Pos2::new(self.x as f32, self.y as f32)
     }
 
-    pub const fn invert_x(self) -> Self {
-        Self {
-            x: -self.x,
+    pub const fn to_vector(self) -> Vector {
+        Vector {
+            x: self.x,
             y: self.y,
         }
-    }
-
-    pub const fn invert_y(self) -> Self {
-        Self {
-            x: self.x,
-            y: -self.y,
-        }
-    }
-}
-
-impl core::ops::Add for Position {
-    type Output = Self;
-
-    fn add(self, rhs: Self) -> Self::Output {
-        Self {
-            x: self.x + rhs.x,
-            y: self.y + rhs.y,
-        }
-    }
-}
-
-impl core::ops::Sub for Position {
-    type Output = Self;
-
-    fn sub(self, rhs: Self) -> Self::Output {
-        Self {
-            x: self.x - rhs.x,
-            y: self.y - rhs.y,
-        }
-    }
-}
-
-impl core::ops::Mul for Position {
-    type Output = Self;
-
-    fn mul(self, rhs: Self) -> Self::Output {
-        Self {
-            x: self.x * rhs.x,
-            y: self.y * rhs.y,
-        }
-    }
-}
-
-impl core::ops::Div for Position {
-    type Output = Self;
-
-    fn div(self, rhs: Self) -> Self::Output {
-        Self {
-            x: self.x / rhs.x,
-            y: self.y / rhs.y,
-        }
-    }
-}
-
-impl AddAssign for Position {
-    fn add_assign(&mut self, rhs: Self) {
-        self.x += rhs.x;
-        self.y += rhs.y;
-    }
-}
-
-impl SubAssign for Position {
-    fn sub_assign(&mut self, rhs: Self) {
-        self.x -= rhs.x;
-        self.y -= rhs.y;
-    }
-}
-
-impl MulAssign for Position {
-    fn mul_assign(&mut self, rhs: Self) {
-        self.x *= rhs.x;
-        self.y *= rhs.y;
-    }
-}
-
-impl DivAssign for Position {
-    fn div_assign(&mut self, rhs: Self) {
-        self.x /= rhs.x;
-        self.y /= rhs.y;
     }
 }
 
@@ -130,6 +36,205 @@ impl From<(f64, f64)> for Position {
         }
     }
 }
+
+#[cfg(feature = "egui")]
+impl Add<Vec2> for Position {
+    type Output = Position;
+
+    fn add(self, rhs: Vec2) -> Self::Output {
+        Self::Output {
+            x: self.x + rhs.x as f64,
+            y: self.y + rhs.y as f64,
+        }
+    }
+}
+
+impl Vector {
+    pub const fn to_position(self) -> Position {
+        Position {
+            x: self.x,
+            y: self.y,
+        }
+    }
+}
+
+macro_rules! impl_constructor {
+    ($name:ident, $t:ty) => {
+        #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
+        pub struct $name {
+            pub x: $t,
+            pub y: $t,
+        }
+
+        impl $name {
+            pub const fn new(x: $t, y: $t) -> Self {
+                Self {
+                    x,
+                    y,
+                }
+            }
+        }
+    };
+}
+
+macro_rules! impl_consts {
+    ($name:ident, $t:ty) => {
+        impl $name {
+            pub const ZERO: $name = $name::new(0.0, 0.0);
+            pub const MAX: $name = $name::new(<$t>::MAX, <$t>::MAX);
+            pub const MIN: $name = $name::new(<$t>::MIN, <$t>::MIN);
+        }
+    };
+}
+macro_rules! impl_ops {
+    ($name:ident) => {
+        impl core::ops::Add for $name {
+            type Output = Self;
+
+            fn add(self, rhs: Self) -> Self::Output {
+                Self {
+                    x: self.x + rhs.x,
+                    y: self.y + rhs.y,
+                }
+            }
+        }
+
+        impl core::ops::Sub for $name {
+            type Output = Self;
+
+            fn sub(self, rhs: Self) -> Self::Output {
+                Self {
+                    x: self.x - rhs.x,
+                    y: self.y - rhs.y,
+                }
+            }
+        }
+
+        impl core::ops::Mul for $name {
+            type Output = Self;
+
+            fn mul(self, rhs: Self) -> Self::Output {
+                Self {
+                    x: self.x * rhs.x,
+                    y: self.y * rhs.y,
+                }
+            }
+        }
+
+        impl core::ops::Div for $name {
+            type Output = Self;
+
+            fn div(self, rhs: Self) -> Self::Output {
+                Self {
+                    x: self.x / rhs.x,
+                    y: self.y / rhs.y,
+                }
+            }
+        }
+
+        impl core::ops::Div<f64> for $name {
+            type Output = $name;
+
+            fn div(self, rhs: f64) -> Self::Output {
+                Self {
+                    x: self.x / rhs,
+                    y: self.y / rhs,
+                }
+            }
+        }
+
+        impl core::ops::Mul<f64> for $name {
+            type Output = $name;
+
+            fn mul(self, rhs: f64) -> Self::Output {
+                Self {
+                    x: self.x * rhs,
+                    y: self.y * rhs,
+                }
+            }
+        }
+
+        impl core::ops::Add<f64> for $name {
+            type Output = $name;
+
+            fn add(self, rhs: f64) -> Self::Output {
+                Self {
+                    x: self.x + rhs,
+                    y: self.y + rhs,
+                }
+            }
+        }
+
+        impl core::ops::Sub<f64> for $name {
+            type Output = $name;
+
+            fn sub(self, rhs: f64) -> Self::Output {
+                Self {
+                    x: self.x - rhs,
+                    y: self.y - rhs,
+                }
+            }
+        }
+
+        impl core::ops::AddAssign for $name {
+            fn add_assign(&mut self, rhs: Self) {
+                self.x += rhs.x;
+                self.y += rhs.y;
+            }
+        }
+
+        impl core::ops::SubAssign for $name {
+            fn sub_assign(&mut self, rhs: Self) {
+                self.x -= rhs.x;
+                self.y -= rhs.y;
+            }
+        }
+
+        impl core::ops::MulAssign for $name {
+            fn mul_assign(&mut self, rhs: Self) {
+                self.x *= rhs.x;
+                self.y *= rhs.y;
+            }
+        }
+
+        impl core::ops::DivAssign for $name {
+            fn div_assign(&mut self, rhs: Self) {
+                self.x /= rhs.x;
+                self.y /= rhs.y;
+            }
+        }
+    };
+}
+
+macro_rules! impl_invert {
+    ($name:ident) => {
+        impl $name {
+            pub const fn invert_x(self) -> Self {
+                Self {
+                    x: -self.x,
+                    y: self.y,
+                }
+            }
+
+            pub const fn invert_y(self) -> Self {
+                Self {
+                    x: self.x,
+                    y: -self.y,
+                }
+            }
+        }
+    };
+}
+
+impl_constructor!(Vector, f64);
+impl_consts!(Vector, f64);
+impl_invert!(Vector);
+impl_ops!(Vector);
+
+impl_constructor!(Position, f64);
+impl_consts!(Position, f64);
+impl_invert!(Position);
+impl_ops!(Position);
 
 pub mod deduplicate {
     use crate::Position;

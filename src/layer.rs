@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use egui::Pos2;
 #[cfg(feature = "egui")]
 use egui::epaint::emath::Vec2;
 use log::{debug, error, warn};
@@ -74,10 +75,10 @@ impl GerberLayer {
                     ..
                 } => {
                     let radius = diameter / 2.0;
-                    bbox.min_x = bbox.min_x.min(center.x - radius);
-                    bbox.min_y = bbox.min_y.min(center.y - radius);
-                    bbox.max_x = bbox.max_x.max(center.x + radius);
-                    bbox.max_y = bbox.max_y.max(center.y + radius);
+                    bbox.min.x = bbox.min.x.min(center.x - radius);
+                    bbox.min.y = bbox.min.y.min(center.y - radius);
+                    bbox.max.x = bbox.max.x.max(center.x + radius);
+                    bbox.max.y = bbox.max.y.max(center.y + radius);
                 }
                 GerberPrimitive::Rectangle {
                     origin,
@@ -85,10 +86,10 @@ impl GerberLayer {
                     height,
                     ..
                 } => {
-                    bbox.min_x = bbox.min_x.min(origin.x);
-                    bbox.min_y = bbox.min_y.min(origin.y);
-                    bbox.max_x = bbox.max_x.max(origin.x + width);
-                    bbox.max_y = bbox.max_y.max(origin.y + height);
+                    bbox.min.x = bbox.min.x.min(origin.x);
+                    bbox.min.y = bbox.min.y.min(origin.y);
+                    bbox.max.x = bbox.max.x.max(origin.x + width);
+                    bbox.max.y = bbox.max.y.max(origin.y + height);
                 }
                 GerberPrimitive::Line {
                     start,
@@ -102,10 +103,10 @@ impl GerberLayer {
                         y,
                     } in &[start, end]
                     {
-                        bbox.min_x = bbox.min_x.min(x - radius);
-                        bbox.min_y = bbox.min_y.min(y - radius);
-                        bbox.max_x = bbox.max_x.max(x + radius);
-                        bbox.max_y = bbox.max_y.max(y + radius);
+                        bbox.min.x = bbox.min.x.min(x - radius);
+                        bbox.min.y = bbox.min.y.min(y - radius);
+                        bbox.max.x = bbox.max.x.max(x + radius);
+                        bbox.max.y = bbox.max.y.max(y + radius);
                     }
                 }
                 GerberPrimitive::Polygon {
@@ -120,10 +121,10 @@ impl GerberLayer {
                     {
                         let x = center.x + dx;
                         let y = center.y + dy;
-                        bbox.min_x = bbox.min_x.min(x);
-                        bbox.min_y = bbox.min_y.min(y);
-                        bbox.max_x = bbox.max_x.max(x);
-                        bbox.max_y = bbox.max_y.max(y);
+                        bbox.min.x = bbox.min.x.min(x);
+                        bbox.min.y = bbox.min.y.min(y);
+                        bbox.max.x = bbox.max.x.max(x);
+                        bbox.max.y = bbox.max.y.max(y);
                     }
                 }
             }
@@ -524,7 +525,7 @@ impl GerberLayer {
 
         let mut layer_primitives = Vec::new();
         let mut current_aperture = None;
-        let mut current_pos = crate::position::ZERO;
+        let mut current_pos = Position::ZERO;
 
         // regions are a special case - they are defined by aperture codes
         let mut current_region_vertices: Vec<Position> = Vec::new();
@@ -776,7 +777,7 @@ impl GerberLayer {
                                                     let circle_radius = rect.x.min(rect.y) / 2.0;
                                                     for (dx, dy) in circle_centers {
                                                         layer_primitives.push(GerberPrimitive::Circle {
-                                                            center: current_pos + (dx, dy).into(),
+                                                            center: current_pos + Position::from((dx, dy)),
                                                             diameter: circle_radius * 2.0,
                                                             exposure: Exposure::Add,
                                                         });
@@ -910,5 +911,19 @@ impl Default for ViewState {
             translation: Vec2::ZERO,
             scale: 1.0,
         }
+    }
+}
+
+impl ViewState {
+    /// Convert to gerber coordinates using view transformation
+    pub fn screen_to_gerber_coords(&self, screen_pos: Pos2) -> Position {
+        let gerber_pos = (screen_pos - self.translation) / self.scale;
+        Position::new(gerber_pos.x as f64, gerber_pos.y as f64).invert_y()
+    }
+
+    /// Convert from gerber coordinates using view transformation
+    pub fn gerber_to_screen_coords(&self, gerber_pos: Position) -> Pos2 {
+        let gerber_pos = gerber_pos.invert_y();
+        ((gerber_pos * self.scale as f64) + self.translation).to_pos2()
     }
 }

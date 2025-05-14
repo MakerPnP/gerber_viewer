@@ -23,6 +23,7 @@ thiserror = "2.0.12"
 
 # Logging
 log = "0.4"
+rstest = "0.25.0"
 
 [features]
 default = ["types", "parser", "egui"]
