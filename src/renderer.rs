@@ -84,8 +84,18 @@ impl GerberRenderer {
 
                     if is_axis_aligned {
                         // Fast-path: axis-aligned rectangle (mirroring allowed, since mirroring across axis doesn't affect axis-alignment)
+                        // Determine if width/height should be swapped
+                        let mut width = *width as f32;
+                        let mut height = *height as f32;
+
+                        if (angle_normalized - 90.0).abs() < f32::EPSILON
+                            || (angle_normalized - 270.0).abs() < f32::EPSILON
+                        {
+                            std::mem::swap(&mut width, &mut height);
+                        }
+
                         let center = (view.translation + transform.apply_to_pos2(screen_center) * view.scale).to_pos2();
-                        let size = Vec2::new(*width as f32, *height as f32) * view.scale;
+                        let size = Vec2::new(width, height) * view.scale;
                         let top_left = center - size / 2.0; // Calculate top-left from center
 
                         painter.rect(
