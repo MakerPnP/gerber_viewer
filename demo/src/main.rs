@@ -3,21 +3,26 @@ use std::io::BufReader;
 use eframe::emath::{Rect, Vec2};
 use eframe::epaint::Color32;
 use gerber_viewer::gerber_parser::parse;
-use gerber_viewer::{draw_arrow, draw_outline, draw_crosshair, BoundingBox, GerberLayer, GerberRenderer, Transform2D, ViewState, Mirroring};
+use gerber_viewer::{draw_arrow, draw_outline, draw_crosshair, BoundingBox, GerberLayer, GerberRenderer, Transform2D, ViewState, Mirroring, draw_marker};
 use gerber_viewer::position::{Position, Vector};
 
 const ENABLE_UNIQUE_SHAPE_COLORS: bool = true;
 const ENABLE_POLYGON_NUMBERING: bool = true;
-const ZOOM_FACTOR: f32 = 0.5;
+const ZOOM_FACTOR: f32 = 1.00;
 const ROTATION: f32 = 45.0_f32.to_radians();
 const MIRRORING: [bool; 2] = [false, false];
 
 // for mirroring and rotation
-const CENTER_OFFSET: Vector = Vector::new(0.0, 0.0);
+const CENTER_OFFSET: Vector = Vector::new(15.0, 20.0);
+//const CENTER_OFFSET: Vector = Vector::new(14.75, 6.0);
 
 // in EDA tools like DipTrace, a gerber offset can be specified when exporting gerbers, e.g. 10,5.
 // use negative offsets here to relocate the gerber back to 0,0, e.g. -10, -5
-const DESIGN_OFFSET: Vector = Vector::new(0.0, 0.0);
+const DESIGN_OFFSET: Vector = Vector::new(-5.0, -10.0);
+//const DESIGN_OFFSET: Vector = Vector::new(-10.0, -10.0);
+
+// radius of the markers, in gerber coordinates
+const MARKER_RADIUS: f32 = 2.5;
 
 struct DemoApp {
     gerber_layer: GerberLayer,
@@ -37,6 +42,10 @@ impl DemoApp {
         //let demo_str = include_str!("../assets/macro-vectorline.gbr").as_bytes();
         //let demo_str = include_str!("../assets/macro-polygons.gbr").as_bytes();
         //let demo_str = include_str!("../assets/macro-polygons-concave.gbr").as_bytes();
+
+        //let demo_str = include_str!(r#"D:\Users\Hydra\Documents\DipTrace\Projects\SPRacingRXN1\Export\SPRacingRXN1-RevB-20240507-1510_gerberx2\TopSilk.gbr"#).as_bytes();
+
+
         let reader = BufReader::new(demo_str);
 
         let doc = parse(reader).unwrap();
@@ -132,9 +141,6 @@ impl eframe::App for DemoApp {
                     DESIGN_OFFSET.into(),
                 );
 
-                let design_offset_screen_position = self.view_state.gerber_to_screen_coords(DESIGN_OFFSET.to_position());
-                draw_arrow(&painter, design_offset_screen_position, gerber_zero_screen_position, Color32::ORANGE);
-
                 let bbox_vertices = self.bbox_vertices.iter().map(|position|{
                     self.view_state.gerber_to_screen_coords(position.clone())
                 }).collect::<Vec<_>>();
@@ -146,6 +152,15 @@ impl eframe::App for DemoApp {
                 }).collect::<Vec<_>>();
 
                 draw_outline(&painter, outline_vertices, Color32::GREEN);
+
+                let screen_radius = MARKER_RADIUS * self.view_state.scale;
+
+                let design_offset_screen_position = self.view_state.gerber_to_screen_coords(DESIGN_OFFSET.to_position());
+                draw_arrow(&painter, design_offset_screen_position, gerber_zero_screen_position, Color32::ORANGE);
+                draw_marker(&painter, design_offset_screen_position, Color32::ORANGE, Color32::YELLOW, screen_radius);
+
+                let design_origin_screen_position = self.view_state.gerber_to_screen_coords((CENTER_OFFSET - DESIGN_OFFSET).to_position());
+                draw_marker(&painter, design_origin_screen_position, Color32::PURPLE, Color32::MAGENTA, screen_radius);
             });
         });
     }
