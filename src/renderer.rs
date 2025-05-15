@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use egui::epaint::emath::{Align2, Vec2b};
+use egui::epaint::emath::Align2;
 use egui::epaint::{Color32, FontId, Mesh, Pos2, Rect, Shape, Stroke, StrokeKind, Vec2, Vertex};
 
 use crate::Transform2D;
