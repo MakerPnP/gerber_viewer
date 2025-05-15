@@ -82,6 +82,7 @@ impl eframe::App for DemoApp {
 }
 
 fn main() -> eframe::Result<()> {
+    env_logger::init(); // Log to stderr (optional).
     eframe::run_native(
         "Gerber Viewer Demo (egui)",
         eframe::NativeOptions::default(),
