@@ -10,6 +10,9 @@ mod renderer;
 #[cfg(feature = "egui")]
 mod drawing;
 
+#[cfg(feature = "egui")]
+mod ui;
+
 pub use color::*;
 #[cfg(feature = "egui")]
 pub use drawing::*;
@@ -23,6 +26,8 @@ pub use gerber_types;
 pub use layer::*;
 #[cfg(feature = "egui")]
 pub use renderer::*;
+#[cfg(feature = "egui")]
+pub use ui::*;
 
 use crate::position::Position;
 

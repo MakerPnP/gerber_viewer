@@ -84,6 +84,12 @@ macro_rules! impl_consts {
             pub const MAX: $name = $name::new(<$t>::MAX, <$t>::MAX);
             pub const MIN: $name = $name::new(<$t>::MIN, <$t>::MIN);
         }
+
+        impl Default for $name {
+            fn default() -> Self {
+                Self::ZERO
+            }
+        }
     };
 }
 macro_rules! impl_ops {

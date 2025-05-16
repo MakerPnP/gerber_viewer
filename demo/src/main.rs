@@ -4,11 +4,11 @@ use eframe::emath::{Rect, Vec2};
 use eframe::epaint::Color32;
 use egui::ViewportBuilder;
 use gerber_viewer::gerber_parser::parse;
-use gerber_viewer::{draw_arrow, draw_outline, draw_crosshair, BoundingBox, GerberLayer, GerberRenderer, Transform2D, ViewState, Mirroring, draw_marker};
+use gerber_viewer::{draw_arrow, draw_outline, draw_crosshair, BoundingBox, GerberLayer, GerberRenderer, Transform2D, ViewState, Mirroring, draw_marker, UiState};
 use gerber_viewer::position::{Position, Vector};
 
 const ENABLE_UNIQUE_SHAPE_COLORS: bool = true;
-const ENABLE_POLYGON_NUMBERING: bool = true;
+const ENABLE_POLYGON_NUMBERING: bool = false;
 const ZOOM_FACTOR: f32 = 0.50;
 const ROTATION_SPEED_DEG_PER_SEC: f32 = 45.0;
 const INITIAL_ROTATION: f32 = 45.0_f32.to_radians();
@@ -29,6 +29,7 @@ const MARKER_RADIUS: f32 = 2.5;
 struct DemoApp {
     gerber_layer: GerberLayer,
     view_state: ViewState,
+    ui_state: UiState,
     needs_initial_view: bool,
 
     last_frame_time: std::time::Instant,
@@ -59,6 +60,7 @@ impl DemoApp {
             view_state: Default::default(),
             needs_initial_view: true,
             rotation_radians: INITIAL_ROTATION,
+            ui_state: Default::default(),
         }
     }
 
@@ -141,28 +143,32 @@ impl eframe::App for DemoApp {
         let outline_vertices_screen = outline_vertices.into_iter()
             .map(|v| self.view_state.gerber_to_screen_coords(v))
             .collect::<Vec<_>>();
-
-
+        
         //
         // Build a UI
         //
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.centered_and_justified(|ui| {
-                let response = ui.allocate_rect(ui.available_rect_before_wrap(), egui::Sense::empty());
+                let response = ui.allocate_rect(ui.available_rect_before_wrap(), egui::Sense::drag());
                 let viewport = response.rect;
 
                 if self.needs_initial_view {
                     self.reset_view(viewport)
                 }
+                
+                //
+                // handle pan, drag and cursor position
+                //
+                self.ui_state.update(ui, &viewport, &response, &mut self.view_state);
 
                 //
                 // Show the gerber layer and other overlays
                 //
 
                 let painter = ui.painter().with_clip_rect(viewport);
-
-                let gerber_zero_screen_position = self.view_state.gerber_to_screen_coords(Position::ZERO);
-                draw_crosshair(&painter, gerber_zero_screen_position, Color32::BLUE);
+                
+                draw_crosshair(&painter, self.ui_state.origin_screen_pos, Color32::BLUE);
+                draw_crosshair(&painter, self.ui_state.center_screen_pos, Color32::LIGHT_GRAY);
 
                 GerberRenderer::default().paint_layer(
                     &painter,
@@ -176,6 +182,8 @@ impl eframe::App for DemoApp {
                     CENTER_OFFSET.into(),
                     DESIGN_OFFSET.into(),
                 );
+                
+                // if you want to display multiple layers, call `paint_layer` for each layer. 
 
                 draw_outline(&painter, bbox_vertices_screen, Color32::RED);
                 draw_outline(&painter, outline_vertices_screen, Color32::GREEN);
@@ -183,7 +191,7 @@ impl eframe::App for DemoApp {
                 let screen_radius = MARKER_RADIUS * self.view_state.scale;
 
                 let design_offset_screen_position = self.view_state.gerber_to_screen_coords(DESIGN_OFFSET.to_position());
-                draw_arrow(&painter, design_offset_screen_position, gerber_zero_screen_position, Color32::ORANGE);
+                draw_arrow(&painter, design_offset_screen_position, self.ui_state.origin_screen_pos, Color32::ORANGE);
                 draw_marker(&painter, design_offset_screen_position, Color32::ORANGE, Color32::YELLOW, screen_radius);
 
                 let design_origin_screen_position = self.view_state.gerber_to_screen_coords((CENTER_OFFSET - DESIGN_OFFSET).to_position());
