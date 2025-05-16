@@ -10,6 +10,17 @@ pub struct Mirroring {
     pub y: bool,
 }
 
+impl core::ops::BitXor for Mirroring {
+    type Output = Self;
+
+    fn bitxor(self, rhs: Self) -> Self::Output {
+        Self {
+            x: self.x ^ rhs.x,
+            y: self.y ^ rhs.y,
+        }
+    }
+}
+
 impl Default for Mirroring {
     fn default() -> Self {
         Self {
