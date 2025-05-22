@@ -16,10 +16,7 @@ application.
 One can use the `Filters` button to filter on INFO, WARNING, ERROR, or a CUSTOM event, or enter an expression/regex and filter on that. 
 
 Additionally the `Save Logs` button will bring up an RFD panel and allow
-saving to a specified file. 
-
-The `System Info` button allows one to see the operating system details of the 
-machine that one is on, along with a banner display. 
+saving to a specified file. The `System Info` button allows one to see the operating system details of the machine that one is on, along with a banner display. 
 
 
 ## Dependencies
