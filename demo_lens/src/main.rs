@@ -3,8 +3,13 @@ use std::io::BufReader;
 use eframe::emath::{Rect, Vec2};
 use eframe::epaint::Color32;
 use egui::ViewportBuilder;
+
+/// egui_lens imports
 use egui_lens::{ReactiveEventLogger, ReactiveEventLoggerState, LogColors};
+
+/// Use of prelude for egui_mobius_reactive
 use egui_mobius_reactive::*; 
+
 use gerber_viewer::gerber_parser::parse;
 use gerber_viewer::{
     draw_arrow, draw_outline, draw_crosshair, BoundingBox, GerberLayer, GerberRenderer, 
@@ -15,7 +20,7 @@ use gerber_viewer::position::Vector;
 
 // Import platform modules
 mod platform;
-use platform::{banner, details, parameters::gui};
+use platform::{banner, details};
 
 const ENABLE_UNIQUE_SHAPE_COLORS: bool = true;
 const ENABLE_POLYGON_NUMBERING: bool = false;
@@ -33,7 +38,14 @@ const DESIGN_OFFSET: Vector = Vector::new(-5.0, -10.0);
 
 // radius of the markers, in gerber coordinates
 const MARKER_RADIUS: f32 = 2.5;
-
+/// The main application struct
+/// 
+/// This struct contains the state of the application, including the Gerber layer, view state, UI state,
+/// and other properties. It also contains the logger state and the banner and details instances. The 
+/// Logger state is used to log events and changes in the application, while the banner and details instances
+/// are used to display information about the application and the system it is running on. Note that the 
+/// logger_state is "reactive" and is used to log events in the application. The log_colors is also "reactive" and is used to
+/// manage the colors used in the logger. 
 struct DemoLensApp {
     gerber_layer: GerberLayer,
     view_state: ViewState,
@@ -60,8 +72,19 @@ struct DemoLensApp {
     
     // DRC Properties
     current_drc_ruleset: Option<String>,
+    
+    // Grid Properties
+    grid_enabled: bool,
+    grid_spacing_mils: f32,
+    grid_dot_size: f32,
 }
 
+/// Implement the DemoLensApp struct
+///
+/// This implementation contains methods for creating a new instance of the app,
+/// configuring custom log colors, and watching for changes in the log colors.
+/// It also contains methods for resetting the view and adding platform details to the app.
+/// 
 impl DemoLensApp {
     // Custom log types for different event categories
     const LOG_TYPE_ROTATION: &'static str = "rotation";
@@ -71,8 +94,9 @@ impl DemoLensApp {
     const LOG_TYPE_MIRROR: &'static str = "mirror";
     const LOG_TYPE_DISPLAY: &'static str = "display";
     const LOG_TYPE_DRC: &'static str = "drc";
+    const LOG_TYPE_GRID: &'static str = "grid";
     
-    /// Configure custom colors 
+    /// **Configure custom colors** 
     /// 
     /// This function will get the current colors from the `Dynamic<LogColors>` instance, 
     /// check if the custom colors for the specified log types are already set,
@@ -102,6 +126,9 @@ impl DemoLensApp {
         }
         if !colors_value.custom_colors.contains_key(Self::LOG_TYPE_DRC) {
             colors_value.set_custom_color(Self::LOG_TYPE_DRC, egui::Color32::from_rgb(155, 89, 182));
+        }
+        if !colors_value.custom_colors.contains_key(Self::LOG_TYPE_GRID) {
+            colors_value.set_custom_color(Self::LOG_TYPE_GRID, egui::Color32::from_rgb(52, 152, 219));
         }
         
         colors.set(colors_value);
@@ -146,6 +173,12 @@ impl DemoLensApp {
         });
     }
     
+    /// **Create a new instance of the DemoLensApp**
+    ///
+    /// This function initializes the application state, including loading the Gerber layer,
+    /// setting up the logger, and configuring the UI properties. It also sets up the initial view
+    /// and adds platform details to the app. The function returns a new instance of the DemoLensApp.
+    ///
     pub fn new() -> Self {
         let demo_str = include_str!("../assets/demo.gbr").as_bytes();
 
@@ -161,7 +194,6 @@ impl DemoLensApp {
         
         // Custom load logic for gerber_viewer
         let mut log_colors = Dynamic::new({
-            // Check if colors exist in the gerber_viewer config directory
             let config_dir = dirs::config_dir()
                 .unwrap_or_else(|| std::path::PathBuf::from("."))
                 .join("gerber_viewer");
@@ -222,6 +254,11 @@ impl DemoLensApp {
             
             // DRC Properties
             current_drc_ruleset: None,
+            
+            // Grid Properties
+            grid_enabled: false,
+            grid_spacing_mils: 10.0,
+            grid_dot_size: 1.0,
         };
         
         // Setup color change watcher to auto-save when colors change
@@ -232,6 +269,12 @@ impl DemoLensApp {
         app
     }
 
+    /// **Add platform details to the app**
+    /// 
+    /// These functions are customizable via the `platform` module.
+    /// The `add_banner_platform_details` function is responsible for logging the banner message
+    /// and system details. It creates a logger using the `ReactiveEventLogger` and logs the banner
+    /// and operating system details.
      fn add_banner_platform_details(&self) {
         // Create a logger using references to our Dynamic state
         let logger = ReactiveEventLogger::with_colors(&self.logger_state, &self.log_colors);
@@ -270,8 +313,81 @@ impl DemoLensApp {
         self.view_state.scale = scale;
         self.needs_initial_view = false;
     }
+    
+    fn draw_grid(&self, painter: &egui::Painter, viewport: &Rect) {
+        if !self.grid_enabled {
+            return;
+        }
+        
+        // Convert mil spacing to gerber units (1 mil = 0.001 inch)
+        let grid_spacing_gerber = self.grid_spacing_mils as f64 * 0.001;
+        
+        // Convert to screen units
+        let grid_spacing_screen = grid_spacing_gerber * self.view_state.scale as f64;
+        
+        // Skip if grid spacing is too small to be visible (less than 5 pixels)
+        if grid_spacing_screen < 5.0 {
+            return;
+        }
+        
+        // Skip if grid spacing is too large (more than half viewport)
+        if grid_spacing_screen > (viewport.width().min(viewport.height()) as f64 * 0.5) {
+            return;
+        }
+        
+        // Convert viewport bounds to gerber coordinates
+        let top_left = self.view_state.screen_to_gerber_coords(viewport.min);
+        let bottom_right = self.view_state.screen_to_gerber_coords(viewport.max);
+        
+        // Due to Y inversion, we need to get proper min/max
+        let min_x = top_left.x.min(bottom_right.x);
+        let max_x = top_left.x.max(bottom_right.x);
+        let min_y = top_left.y.min(bottom_right.y);
+        let max_y = top_left.y.max(bottom_right.y);
+        
+        // Calculate grid start/end indices
+        let start_x = (min_x / grid_spacing_gerber).floor() as i32 - 1;
+        let end_x = (max_x / grid_spacing_gerber).ceil() as i32 + 1;
+        let start_y = (min_y / grid_spacing_gerber).floor() as i32 - 1;
+        let end_y = (max_y / grid_spacing_gerber).ceil() as i32 + 1;
+        
+        // Limit the number of grid points to prevent performance issues
+        let max_points = 10000;
+        let total_points = ((end_x - start_x) * (end_y - start_y)).abs();
+        if total_points > max_points {
+            return;
+        }
+        
+        // Grid color - adjust opacity based on grid density
+        let opacity = if grid_spacing_screen > 50.0 { 120 } else { 60 };
+        let grid_color = Color32::from_rgba_premultiplied(100, 100, 100, opacity);
+        
+        // Draw grid dots
+        for grid_x in start_x..=end_x {
+            for grid_y in start_y..=end_y {
+                let x = grid_x as f64 * grid_spacing_gerber;
+                let y = grid_y as f64 * grid_spacing_gerber;
+                let grid_pos = gerber_viewer::position::Position::new(x, y);
+                let screen_pos = self.view_state.gerber_to_screen_coords(grid_pos);
+                
+                // Only draw if within viewport
+                if viewport.contains(screen_pos) {
+                    painter.circle_filled(screen_pos, self.grid_dot_size, grid_color);
+                }
+            }
+        }
+    }
 }
 
+/// Implement the eframe::App trait for DemoLensApp
+///
+/// This implementation contains the main event loop for the application, including
+/// handling user input, updating the UI, and rendering the Gerber layer. It also contains
+/// the logic for handling the logger and displaying system information.
+/// The `update` method is called every frame and is responsible for updating the UI
+/// and rendering the Gerber layer. It also handles user input and updates the logger
+/// state. The `update` method is where most of the application logic resides.
+/// 
 impl eframe::App for DemoLensApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Create a logger for this frame
@@ -586,6 +702,74 @@ impl eframe::App for DemoLensApp {
                 });
             
             ui.separator();
+            
+            // Grid Settings section
+            ui.heading("Grid Settings");
+            ui.add_space(4.0);
+            
+            let prev_grid_enabled = self.grid_enabled;
+            if ui.checkbox(&mut self.grid_enabled, "Enable Grid").changed() {
+                logger.log_custom(
+                    Self::LOG_TYPE_GRID,
+                    &format!("Grid display {}", if self.grid_enabled { "enabled" } else { "disabled" })
+                );
+            }
+            
+            ui.horizontal(|ui| {
+                ui.label("Grid Spacing (mils):");
+                let prev_spacing = self.grid_spacing_mils;
+                
+                // Add slider
+                let slider_response = ui.add(
+                    egui::Slider::new(&mut self.grid_spacing_mils, 1.0..=1000.0)
+                        .logarithmic(true)
+                );
+                
+                // Add text input box next to slider
+                let text_response = ui.add(
+                    egui::DragValue::new(&mut self.grid_spacing_mils)
+                        .speed(1.0)
+                        .range(1.0..=1000.0)
+                        .suffix(" mils")
+                );
+                
+                if slider_response.changed() || text_response.changed() {
+                    logger.log_custom(
+                        Self::LOG_TYPE_GRID,
+                        &format!("Grid spacing changed from {:.1} to {:.1} mils", prev_spacing, self.grid_spacing_mils)
+                    );
+                }
+            });
+            
+            ui.horizontal(|ui| {
+                ui.label("Grid Dot Size:");
+                let prev_dot_size = self.grid_dot_size;
+                if ui.add(egui::Slider::new(&mut self.grid_dot_size, 0.5..=5.0)).changed() {
+                    logger.log_custom(
+                        Self::LOG_TYPE_GRID,
+                        &format!("Grid dot size changed from {:.1} to {:.1}", prev_dot_size, self.grid_dot_size)
+                    );
+                }
+            });
+            
+            // Show grid visibility status
+            if self.grid_enabled {
+                let grid_spacing_gerber = self.grid_spacing_mils as f64 * 0.001;
+                let grid_spacing_screen = grid_spacing_gerber * self.view_state.scale as f64;
+                
+                if grid_spacing_screen < 5.0 {
+                    ui.colored_label(egui::Color32::from_rgb(255, 165, 0), 
+                        egui::RichText::new("⚠ Grid too fine to display - zoom in or increase spacing").small());
+                } else if grid_spacing_screen > 300.0 {
+                    ui.colored_label(egui::Color32::from_rgb(255, 165, 0), 
+                        egui::RichText::new("⚠ Grid too coarse - zoom out or decrease spacing").small());
+                } else {
+                    ui.colored_label(egui::Color32::from_rgb(0, 255, 0), 
+                        egui::RichText::new(format!("✓ Grid visible (~{:.0} pixels)", grid_spacing_screen)).small());
+                }
+            }
+            
+            ui.separator();
             ui.heading("Event Log");
             // Display the logger
             logger.show(ui);
@@ -610,6 +794,11 @@ impl eframe::App for DemoLensApp {
                 //
 
                 let painter = ui.painter().with_clip_rect(viewport);
+                
+                // Draw grid if enabled (before other elements so it appears underneath)
+                if self.grid_enabled {
+                    self.draw_grid(&painter, &viewport);
+                }
                 
                 draw_crosshair(&painter, self.ui_state.origin_screen_pos, Color32::BLUE);
                 draw_crosshair(&painter, self.ui_state.center_screen_pos, Color32::LIGHT_GRAY);
@@ -645,6 +834,10 @@ impl eframe::App for DemoLensApp {
     }
 }
 
+/// The main function is the entry point of the application.
+/// 
+/// It initializes the logger, sets up the native window options,
+/// and runs the application using the `eframe` framework.
 fn main() -> eframe::Result<()> {
     env_logger::init(); // Log to stderr (optional).
     eframe::run_native(

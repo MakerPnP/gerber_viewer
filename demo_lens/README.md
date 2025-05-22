@@ -6,29 +6,21 @@ An interactive demonstration application showcasing the integration of `egui_len
 
 ## Features
 
-### Core Functionality
-- **Interactive Gerber Visualization**: Real-time rendering of Gerber files with customizable display options
-- **Reactive Event Logging**: Live logging of all user interactions and state changes using `egui_lens`
-- **Property Controls**: Intuitive UI controls for manipulating gerber display properties
-- **Design Rule Checking (DRC)**: Simulated PCB manufacturer rule validation
+There are numerous features in the design such as the ability to zooming and panning
+with the mouse, along with setting various offsets and mirroring throught the GUI. These are all part of the native `gerber_viewer` as part of the `MakerPnP` project. 
 
-### Visual Features
-- **Animated Rotation**: Configurable rotation speed for dynamic visualization
-- **Zoom Controls**: Adjustable zoom factor with instant preview
-- **Mirroring Options**: X and Y axis mirroring toggles
-- **Offset Controls**: Both center and design offset adjustments
-- **Color Customization**: Unique colors for different shapes and polygon numbering
-- **Visual Overlays**: Bounding boxes, crosshairs, and markers for reference
+The reactive logger is an instance of `egui_lens` and is setup to log all GUI events, where one can customize the colors
+of each event through the `Log Colors` button and have that chosen color persist when exiting and restarting the 
+application. 
 
-### Event Logging Categories
-The demo uses custom log types with distinct colors:
-- `rotation` - Orange (#E67E22) - Rotation speed changes
-- `zoom` - Blue (#2980B9) - Zoom factor adjustments
-- `center_offset` - Purple (#8E44AD) - Center offset modifications
-- `design_offset` - Green (#27AE60) - Design offset changes
-- `mirror` - Red (#C0392B) - Mirroring state changes
-- `display` - Yellow (#F1C40F) - Display option toggles
-- `drc` - Light Purple (#9B59B6) - Design rule check operations
+One can use the `Filters` button to filter on INFO, WARNING, ERROR, or a CUSTOM event, or enter an expression/regex and filter on that. 
+
+Additionally the `Save Logs` button will bring up an RFD panel and allow
+saving to a specified file. 
+
+The `System Info` button allows one to see the operating system details of the 
+machine that one is on, along with a banner display. 
+
 
 ## Dependencies
 
@@ -48,35 +40,6 @@ cd demo_lens
 cargo run
 ```
 
-### Controls
-
-**Left Panel - Properties:**
-- **Rotation Speed**: Slider to control rotation animation (0-180 deg/s)
-- **Zoom Factor**: Slider to adjust zoom level (0.1-2.0x)
-- **Apply Zoom**: Button to reset view with new zoom factor
-- **Enable Unique Colors**: Checkbox for shape-specific coloring
-- **Enable Polygon Numbering**: Checkbox to display polygon indices
-- **Mirroring**: X and Y axis mirror toggles
-- **Center Offset**: X/Y offset controls for rotation center
-- **Design Offset**: X/Y offset controls for design positioning
-
-**Design Rule Check Section:**
-- **PCB Manufacturer Rules**: Collapsible section with manufacturer presets
-  - JLC PCB Rules
-  - PCB WAY Rules
-  - Advanced Circuits Rules
-- **Run DRC**: Execute design rule validation
-- **Clear Ruleset**: Remove currently loaded ruleset
-
-**Central Panel - Viewer:**
-- Drag to pan the view
-- Visual indicators:
-  - Blue crosshair: Origin position
-  - Gray crosshair: Center position
-  - Red outline: Transformed bounding box
-  - Green outline: Rotated gerber outline
-  - Orange marker: Design offset position
-  - Purple marker: Design origin position
 
 ## Configuration
 
@@ -101,57 +64,6 @@ const DESIGN_OFFSET: Vector = Vector::new(-5.0, -10.0);
 const MARKER_RADIUS: f32 = 2.5;
 ```
 
-## Architecture
-
-### State Management
-The demo uses `egui_mobius_reactive` for reactive state management:
-- `Dynamic<ReactiveEventLoggerState>` - Logger state container
-- `Dynamic<LogColors>` - Color configuration with change detection
-- Automatic persistence of color preferences
-
-### Event Flow
-1. User interacts with UI controls
-2. Change handlers log events with appropriate categories
-3. Logger displays events with custom colors
-4. State changes trigger reactive updates
-5. Gerber view updates in real-time
-
-### Platform Integration
-The demo includes platform-specific modules:
-- `banner` - Application banner and version info
-- `details` - System information display
-- `parameters` - Configuration constants
-
-## Example Use Cases
-
-1. **PCB Design Validation**: Load gerber files and run DRC checks against manufacturer specifications
-2. **Interactive Visualization**: Rotate and examine PCB designs from different angles
-3. **Event Monitoring**: Track all user interactions for debugging or usage analytics
-4. **UI Development**: Reference implementation for integrating `egui_lens` in applications
-
-## Development
-
-### Adding New Log Types
-1. Define a new constant in `DemoLensApp`:
-   ```rust
-   const LOG_TYPE_CUSTOM: &'static str = "custom";
-   ```
-
-2. Configure color in `configure_custom_log_colors_if_missing`:
-   ```rust
-   colors_value.set_custom_color(Self::LOG_TYPE_CUSTOM, egui::Color32::from_rgb(R, G, B));
-   ```
-
-3. Use in event handlers:
-   ```rust
-   logger.log_custom(Self::LOG_TYPE_CUSTOM, "Custom event occurred");
-   ```
-
-### Extending DRC Functionality
-The current DRC implementation is simulated. To add real validation:
-1. Implement rule definitions in a separate module
-2. Add gerber analysis logic
-3. Replace simulated messages with actual validation results
 
 ## License
 
