@@ -8,7 +8,7 @@ authors = ["James Hebden"]
 egui = "0.31.1"
 eframe = "0.31.1"
 gerber_viewer = { path = "..", features = ["egui", "parser", "types"] }
-egui_lens = { path = "/home/james/raid_one/software_projects/atlantix/Egui/egui_lens/crates/egui_lens" }
+egui_lens = { version = "0.1.0"}
 egui_mobius_reactive = { version = "0.3.0-alpha.31" }
 egui_mobius = { version = "0.3.0-alpha.31" }
 env_logger = "0.11.8"
