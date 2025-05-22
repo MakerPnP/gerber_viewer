@@ -1179,6 +1179,8 @@ dependencies = [
 [[package]]
 name = "egui_lens"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25f91279d50c3d28072c6b5d6736768930eaaece76d079095aba750a12e746d2"
 dependencies = [
  "chrono",
  "dirs",
