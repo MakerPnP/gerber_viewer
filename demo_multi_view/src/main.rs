@@ -18,142 +18,21 @@ use gerber_viewer::{
 use gerber_viewer::position::Vector;
 use std::collections::HashMap;
 
-
 // Import platform modules
 mod platform;
 use platform::{banner, details};
 
-const ENABLE_UNIQUE_SHAPE_COLORS: bool = false;
-const ENABLE_POLYGON_NUMBERING: bool = false;
-const MIRRORING: [bool; 2] = [false, false];
+// Import new modules
+mod constants;
+mod layers;
+mod grid;
+mod ui;
 
-// for mirroring and rotation
-const CENTER_OFFSET: Vector = Vector::new(0.0, 0.0);
+use constants::*;
+use layers::{LayerType, LayerInfo};
+use grid::GridSettings;
 
-// in EDA tools like DipTrace, a gerber offset can be specified when exporting gerbers, e.g. 10,5.
-// use negative offsets here to relocate the gerber back to 0,0, e.g. -10, -5
-const DESIGN_OFFSET: Vector = Vector::new(0.0, 0.0);
 
-// radius of the markers, in gerber coordinates
-const MARKER_RADIUS: f32 = 2.5;
-
-/// Represents different PCB layers
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum LayerType {
-    TopCopper,
-    BottomCopper,
-    TopSilk,
-    BottomSilk,
-    TopSoldermask,
-    BottomSoldermask,
-    MechanicalOutline,
-}
-
-impl LayerType {
-    fn all() -> Vec<Self> {
-        vec![
-            Self::TopCopper,
-            Self::BottomCopper,
-            Self::TopSilk,
-            Self::BottomSilk,
-            Self::TopSoldermask,
-            Self::BottomSoldermask,
-            Self::MechanicalOutline,
-        ]
-    }
-    
-    fn display_name(&self) -> &'static str {
-        match self {
-            Self::TopCopper => "Top Copper",
-            Self::BottomCopper => "Bottom Copper",
-            Self::TopSilk => "Top Silk",
-            Self::BottomSilk => "Bottom Silk",
-            Self::TopSoldermask => "Top Soldermask",
-            Self::BottomSoldermask => "Bottom Soldermask",
-            Self::MechanicalOutline => "Mechanical Outline",
-        }
-    }
-    
-    fn color(&self) -> Color32 {
-        match self {
-            Self::TopCopper => Color32::from_rgba_premultiplied(184, 115, 51, 220),      // Copper with transparency
-            Self::BottomCopper => Color32::from_rgba_premultiplied(115, 184, 51, 220),   // Different copper color for bottom
-            Self::TopSilk => Color32::from_rgba_premultiplied(255, 255, 255, 250),       // White silk
-            Self::BottomSilk => Color32::from_rgba_premultiplied(255, 255, 255, 250),    // White silk
-            Self::TopSoldermask => Color32::from_rgba_premultiplied(0, 132, 80, 180),    // Green with transparency
-            Self::BottomSoldermask => Color32::from_rgba_premultiplied(0, 80, 132, 180), // Blue for bottom soldermask
-            Self::MechanicalOutline => Color32::from_rgba_premultiplied(255, 255, 0, 250), // Yellow outline
-        }
-    }
-}
-
-/// Layer information including the gerber data and visibility
-struct LayerInfo {
-    layer_type: LayerType,
-    gerber_layer: Option<GerberLayer>,
-    visible: bool,
-}
-
-// Standalone function to draw grid
-fn draw_grid(painter: &egui::Painter, viewport: &Rect, view_state: ViewState, grid_spacing_mils: f32, grid_dot_size: f32) {
-    // Convert mil spacing to gerber units (1 mil = 0.001 inch)
-    let grid_spacing_gerber = grid_spacing_mils as f64 * 0.001;
-    
-    // Convert to screen units
-    let grid_spacing_screen = grid_spacing_gerber * view_state.scale as f64;
-    
-    // Skip if grid spacing is too small to be visible (less than 5 pixels)
-    if grid_spacing_screen < 5.0 {
-        return;
-    }
-    
-    // Skip if grid spacing is too large (more than half viewport)
-    if grid_spacing_screen > (viewport.width().min(viewport.height()) as f64 * 0.5) {
-        return;
-    }
-    
-    // Convert viewport bounds to gerber coordinates
-    let top_left = view_state.screen_to_gerber_coords(viewport.min);
-    let bottom_right = view_state.screen_to_gerber_coords(viewport.max);
-    
-    // Due to Y inversion, we need to get proper min/max
-    let min_x = top_left.x.min(bottom_right.x);
-    let max_x = top_left.x.max(bottom_right.x);
-    let min_y = top_left.y.min(bottom_right.y);
-    let max_y = top_left.y.max(bottom_right.y);
-    
-    // Calculate grid start/end indices
-    let start_x = (min_x / grid_spacing_gerber).floor() as i32 - 1;
-    let end_x = (max_x / grid_spacing_gerber).ceil() as i32 + 1;
-    let start_y = (min_y / grid_spacing_gerber).floor() as i32 - 1;
-    let end_y = (max_y / grid_spacing_gerber).ceil() as i32 + 1;
-    
-    // Limit the number of grid points to prevent performance issues
-    let max_points = 10000;
-    let total_points = ((end_x - start_x) * (end_y - start_y)).abs();
-    if total_points > max_points {
-        return;
-    }
-    
-    // Grid color - adjust opacity based on grid density
-    let opacity = if grid_spacing_screen > 50.0 { 120 } else { 60 };
-    let grid_color = Color32::from_rgba_premultiplied(100, 100, 100, opacity);
-    
-    // Draw grid dots
-    for grid_x in start_x..=end_x {
-        for grid_y in start_y..=end_y {
-            let x = grid_x as f64 * grid_spacing_gerber;
-            let y = grid_y as f64 * grid_spacing_gerber;
-            let grid_pos = gerber_viewer::position::Position::new(x, y);
-            let screen_pos = view_state.gerber_to_screen_coords(grid_pos);
-            
-            // Only draw if within viewport
-            if viewport.contains(screen_pos) {
-                painter.circle_filled(screen_pos, grid_dot_size, grid_color);
-            }
-        }
-    }
-}
 
 /// The main application struct
 /// 
@@ -163,40 +42,38 @@ fn draw_grid(painter: &egui::Painter, viewport: &Rect, view_state: ViewState, gr
 /// are used to display information about the application and the system it is running on. Note that the 
 /// logger_state is "reactive" and is used to log events in the application. The log_colors is also "reactive" and is used to
 /// manage the colors used in the logger. 
-struct DemoLensApp {
+pub struct DemoLensApp {
     // Multi-layer support
-    layers: HashMap<LayerType, LayerInfo>,
-    active_layer: LayerType,
+    pub layers: HashMap<LayerType, LayerInfo>,
+    pub active_layer: LayerType,
     
     // Legacy single layer support (for compatibility)
-    gerber_layer: GerberLayer,
-    view_state: ViewState,
-    ui_state: UiState,
-    needs_initial_view: bool,
+    pub gerber_layer: GerberLayer,
+    pub view_state: ViewState,
+    pub ui_state: UiState,
+    pub needs_initial_view: bool,
 
-    rotation_degrees: f32,
+    pub rotation_degrees: f32,
     
     // Logger state
-    logger_state: Dynamic<ReactiveEventLoggerState>,
-    log_colors: Dynamic<LogColors>,
-    banner: banner::Banner,
-    details: details::Details,
+    pub logger_state: Dynamic<ReactiveEventLoggerState>,
+    pub log_colors: Dynamic<LogColors>,
+    pub banner: banner::Banner,
+    pub details: details::Details,
     
     // Properties
-    enable_unique_colors: bool,
-    enable_polygon_numbering: bool,
-    mirroring: Mirroring,
-    center_offset: Vector,
-    design_offset: Vector,
-    showing_top: bool,  // true = top layers, false = bottom layers
+    pub enable_unique_colors: bool,
+    pub enable_polygon_numbering: bool,
+    pub mirroring: Mirroring,
+    pub center_offset: Vector,
+    pub design_offset: Vector,
+    pub showing_top: bool,  // true = top layers, false = bottom layers
     
     // DRC Properties
-    current_drc_ruleset: Option<String>,
+    pub current_drc_ruleset: Option<String>,
     
-    // Grid Properties
-    grid_enabled: bool,
-    grid_spacing_mils: f32,
-    grid_dot_size: f32,
+    // Grid Settings
+    pub grid_settings: GridSettings,
 }
 
 /// Implement the DemoLensApp struct
@@ -206,13 +83,6 @@ struct DemoLensApp {
 /// It also contains methods for resetting the view and adding platform details to the app.
 /// 
 impl DemoLensApp {
-    // Custom log types for different event categories
-    const LOG_TYPE_ROTATION: &'static str = "rotation";
-    const LOG_TYPE_CENTER_OFFSET: &'static str = "center_offset";
-    const LOG_TYPE_DESIGN_OFFSET: &'static str = "design_offset";
-    const LOG_TYPE_MIRROR: &'static str = "mirror";
-    const LOG_TYPE_DRC: &'static str = "drc";
-    const LOG_TYPE_GRID: &'static str = "grid";
     
     /// **Configure custom colors** 
     /// 
@@ -224,23 +94,23 @@ impl DemoLensApp {
 
         let mut colors_value = colors.get();
         
-        if !colors_value.custom_colors.contains_key(Self::LOG_TYPE_ROTATION) {
-            colors_value.set_custom_color(Self::LOG_TYPE_ROTATION, egui::Color32::from_rgb(230, 126, 34));
+        if !colors_value.custom_colors.contains_key(LOG_TYPE_ROTATION) {
+            colors_value.set_custom_color(LOG_TYPE_ROTATION, egui::Color32::from_rgb(230, 126, 34));
         }
-        if !colors_value.custom_colors.contains_key(Self::LOG_TYPE_CENTER_OFFSET) {
-            colors_value.set_custom_color(Self::LOG_TYPE_CENTER_OFFSET, egui::Color32::from_rgb(142, 68, 173));
+        if !colors_value.custom_colors.contains_key(LOG_TYPE_CENTER_OFFSET) {
+            colors_value.set_custom_color(LOG_TYPE_CENTER_OFFSET, egui::Color32::from_rgb(142, 68, 173));
         }
-        if !colors_value.custom_colors.contains_key(Self::LOG_TYPE_DESIGN_OFFSET) {
-            colors_value.set_custom_color(Self::LOG_TYPE_DESIGN_OFFSET, egui::Color32::from_rgb(39, 174, 96));
+        if !colors_value.custom_colors.contains_key(LOG_TYPE_DESIGN_OFFSET) {
+            colors_value.set_custom_color(LOG_TYPE_DESIGN_OFFSET, egui::Color32::from_rgb(39, 174, 96));
         }
-        if !colors_value.custom_colors.contains_key(Self::LOG_TYPE_MIRROR) {
-            colors_value.set_custom_color(Self::LOG_TYPE_MIRROR, egui::Color32::from_rgb(192, 57, 43));
+        if !colors_value.custom_colors.contains_key(LOG_TYPE_MIRROR) {
+            colors_value.set_custom_color(LOG_TYPE_MIRROR, egui::Color32::from_rgb(192, 57, 43));
         }
-        if !colors_value.custom_colors.contains_key(Self::LOG_TYPE_DRC) {
-            colors_value.set_custom_color(Self::LOG_TYPE_DRC, egui::Color32::from_rgb(155, 89, 182));
+        if !colors_value.custom_colors.contains_key(LOG_TYPE_DRC) {
+            colors_value.set_custom_color(LOG_TYPE_DRC, egui::Color32::from_rgb(155, 89, 182));
         }
-        if !colors_value.custom_colors.contains_key(Self::LOG_TYPE_GRID) {
-            colors_value.set_custom_color(Self::LOG_TYPE_GRID, egui::Color32::from_rgb(52, 152, 219));
+        if !colors_value.custom_colors.contains_key(LOG_TYPE_GRID) {
+            colors_value.set_custom_color(LOG_TYPE_GRID, egui::Color32::from_rgb(52, 152, 219));
         }
         
         colors.set(colors_value);
@@ -338,11 +208,11 @@ impl DemoLensApp {
                 }
             };
             
-            let layer_info = LayerInfo {
+            let layer_info = LayerInfo::new(
                 layer_type,
-                gerber_layer: layer_gerber,
-                visible: matches!(layer_type, LayerType::TopCopper | LayerType::MechanicalOutline),
-            };
+                layer_gerber,
+                matches!(layer_type, LayerType::TopCopper | LayerType::MechanicalOutline),
+            );
             layers.insert(layer_type, layer_info);
         }
         
@@ -412,10 +282,8 @@ impl DemoLensApp {
             // DRC Properties
             current_drc_ruleset: None,
             
-            // Grid Properties
-            grid_enabled: false,
-            grid_spacing_mils: 10.0,
-            grid_dot_size: 1.0,
+            // Grid Settings
+            grid_settings: GridSettings::default(),
         };
         
         // Setup color change watcher to auto-save when colors change
@@ -491,72 +359,6 @@ impl DemoLensApp {
         self.view_state.scale = scale;
         self.needs_initial_view = false;
     }
-    
-    
-    fn draw_grid(&self, painter: &egui::Painter, viewport: &Rect) {
-        if !self.grid_enabled {
-            return;
-        }
-        
-        // The CMOS S7 gerber files use millimeters (mm) as the unit
-        // 1 mil = 0.0254 mm, so to convert mils to mm we multiply by 0.0254
-        let grid_spacing_gerber = self.grid_spacing_mils as f64 * 0.0254;
-        
-        // Convert to screen units
-        let grid_spacing_screen = grid_spacing_gerber * self.view_state.scale as f64;
-        
-        // Skip if grid spacing is too small to be visible (less than 5 pixels)
-        if grid_spacing_screen < 5.0 {
-            return;
-        }
-        
-        // Skip if grid spacing is too large (more than half viewport)
-        if grid_spacing_screen > (viewport.width().min(viewport.height()) as f64 * 0.5) {
-            return;
-        }
-        
-        // Convert viewport bounds to gerber coordinates
-        let top_left = self.view_state.screen_to_gerber_coords(viewport.min);
-        let bottom_right = self.view_state.screen_to_gerber_coords(viewport.max);
-        
-        // Due to Y inversion, we need to get proper min/max
-        let min_x = top_left.x.min(bottom_right.x);
-        let max_x = top_left.x.max(bottom_right.x);
-        let min_y = top_left.y.min(bottom_right.y);
-        let max_y = top_left.y.max(bottom_right.y);
-        
-        // Calculate grid start/end indices
-        let start_x = (min_x / grid_spacing_gerber).floor() as i32 - 1;
-        let end_x = (max_x / grid_spacing_gerber).ceil() as i32 + 1;
-        let start_y = (min_y / grid_spacing_gerber).floor() as i32 - 1;
-        let end_y = (max_y / grid_spacing_gerber).ceil() as i32 + 1;
-        
-        // Limit the number of grid points to prevent performance issues
-        let max_points = 10000;
-        let total_points = ((end_x - start_x) * (end_y - start_y)).abs();
-        if total_points > max_points {
-            return;
-        }
-        
-        // Grid color - adjust opacity based on grid density
-        let opacity = if grid_spacing_screen > 50.0 { 120 } else { 60 };
-        let grid_color = Color32::from_rgba_premultiplied(100, 100, 100, opacity);
-        
-        // Draw grid dots
-        for grid_x in start_x..=end_x {
-            for grid_y in start_y..=end_y {
-                let x = grid_x as f64 * grid_spacing_gerber;
-                let y = grid_y as f64 * grid_spacing_gerber;
-                let grid_pos = gerber_viewer::position::Position::new(x, y);
-                let screen_pos = self.view_state.gerber_to_screen_coords(grid_pos);
-                
-                // Only draw if within viewport
-                if viewport.contains(screen_pos) {
-                    painter.circle_filled(screen_pos, self.grid_dot_size, grid_color);
-                }
-            }
-        }
-    }
 }
 
 /// Implement the eframe::App trait for DemoLensApp
@@ -571,7 +373,7 @@ impl DemoLensApp {
 impl eframe::App for DemoLensApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Create a logger for this frame
-        let logger = ReactiveEventLogger::with_colors(&self.logger_state, &self.log_colors);
+        let _logger = ReactiveEventLogger::with_colors(&self.logger_state, &self.log_colors);
         
         let show_system_info = ctx.memory(|mem| {
             mem.data.get_temp::<bool>(egui::Id::new("show_system_info")).unwrap_or(false)
@@ -633,352 +435,8 @@ impl eframe::App for DemoLensApp {
         // Build a UI
         //
         
-        // Left panel for property editing with egui
-        egui::SidePanel::left("properties_panel").show(ctx, |ui| {
-            ui.heading("Layer Controls");
-            ui.separator();
-            
-            // Layer visibility controls
-            ui.label(&format!("Visible Layers (Showing {} side):", if self.showing_top { "TOP" } else { "BOTTOM" }));
-            ui.add_space(4.0);
-            
-            // Quick controls
-            ui.horizontal(|ui| {
-                if ui.button("Show All").clicked() {
-                    for layer_info in self.layers.values_mut() {
-                        layer_info.visible = true;
-                    }
-                    logger.log_info("All layers shown");
-                }
-                if ui.button("Hide All").clicked() {
-                    for layer_info in self.layers.values_mut() {
-                        layer_info.visible = false;
-                    }
-                    logger.log_info("All layers hidden");
-                }
-            });
-            ui.add_space(4.0);
-            
-            for layer_type in LayerType::all() {
-                if let Some(layer_info) = self.layers.get_mut(&layer_type) {
-                    // Only show relevant layers based on showing_top
-                    let show_control = match layer_type {
-                        LayerType::TopCopper | LayerType::TopSilk | LayerType::TopSoldermask => self.showing_top,
-                        LayerType::BottomCopper | LayerType::BottomSilk | LayerType::BottomSoldermask => !self.showing_top,
-                        LayerType::MechanicalOutline => true, // Always show outline control
-                    };
-                    
-                    if show_control {
-                        ui.horizontal(|ui| {
-                            let was_visible = layer_info.visible;
-                            ui.checkbox(&mut layer_info.visible, "");
-                            
-                            // Color indicator box
-                            let (_, rect) = ui.allocate_space(Vec2::new(20.0, 16.0));
-                            ui.painter().rect_filled(rect, 2.0, layer_type.color());
-                            
-                            ui.label(layer_type.display_name());
-                            
-                            if was_visible != layer_info.visible {
-                                logger.log_info(&format!("{} layer {}", 
-                                    layer_type.display_name(),
-                                    if layer_info.visible { "shown" } else { "hidden" }
-                                ));
-                            }
-                        });
-                    }
-                }
-            }
-            
-            ui.add_space(8.0);
-            ui.separator();
-            ui.label("Board: CMOD S7 (PCBWAY)");
-            ui.label("Each layer loaded from separate gerber file.");
-            ui.label("Different colors help distinguish layers.");
-            
-            ui.separator();
-            ui.heading("Orientation");
-            
-            // Create a logger for this frame
-            let logger = ReactiveEventLogger::with_colors(&self.logger_state, &self.log_colors);
-            
-            // Orientation controls
-            ui.horizontal(|ui| {
-                if ui.button("📍 Center").clicked() {
-                    self.center_offset = Vector::new(0.0, 0.0);
-                    self.design_offset = Vector::new(0.0, 0.0);
-                    self.needs_initial_view = true;
-                    logger.log_info("Centered gerber at (0,0)");
-                }
-                
-                if ui.button("🔄 Flip Top/Bottom").clicked() {
-                    self.showing_top = !self.showing_top;
-                    logger.log_info(&format!("Showing {} layers", if self.showing_top { "top" } else { "bottom" }));
-                }
-            });
-            
-            ui.horizontal(|ui| {
-                if ui.checkbox(&mut self.mirroring.x, "X Mirror").clicked() {
-                    logger.log_custom(
-                        Self::LOG_TYPE_MIRROR,
-                        &format!("X mirroring {}", if self.mirroring.x { "enabled" } else { "disabled" })
-                    );
-                }
-                
-                if ui.checkbox(&mut self.mirroring.y, "Y Mirror").clicked() {
-                    logger.log_custom(
-                        Self::LOG_TYPE_MIRROR,
-                        &format!("Y mirroring {}", if self.mirroring.y { "enabled" } else { "disabled" })
-                    );
-                }
-            });
-            
-            ui.horizontal(|ui| {
-                ui.label("Rotate by");
-                let prev_rotation = self.rotation_degrees;
-                if ui.add(egui::DragValue::new(&mut self.rotation_degrees).suffix("°").speed(1.0)).changed() {
-                    logger.log_custom(
-                        Self::LOG_TYPE_ROTATION, 
-                        &format!("Rotation changed from {:.1}° to {:.1}°", prev_rotation, self.rotation_degrees)
-                    );
-                }
-                ui.label("degrees");
-            });
-            
-            ui.separator();
-            
-            // Advanced offset controls (initially hidden)
-            egui::CollapsingHeader::new("Advanced Offsets")
-                .default_open(false)
-                .show(ui, |ui| {
-                    ui.columns(2, |columns| {
-                        // Column 1: Center Offset
-                        columns[0].group(|ui| {
-                            ui.heading("Center Offset");
-                            ui.add_space(4.0);
-                            
-                            let mut center_changed = false;
-                            let old_center_x = self.center_offset.x;
-                            let old_center_y = self.center_offset.y;
-                            
-                            ui.horizontal(|ui| {
-                                ui.label("X:");
-                                if ui.add(egui::DragValue::new(&mut self.center_offset.x).speed(0.1)).changed() {
-                                    center_changed = true;
-                                }
-                            });
-                            ui.horizontal(|ui| {
-                                ui.label("Y:");
-                                if ui.add(egui::DragValue::new(&mut self.center_offset.y).speed(0.1)).changed() {
-                                    center_changed = true;
-                                }
-                            });
-                            
-                            if center_changed {
-                                logger.log_custom(
-                                    Self::LOG_TYPE_CENTER_OFFSET,
-                                    &format!("Center offset changed from ({:.1}, {:.1}) to ({:.1}, {:.1})", 
-                                            old_center_x, old_center_y, self.center_offset.x, self.center_offset.y)
-                                );
-                            }
-                        });
-                        
-                        // Column 2: Design Offset
-                        columns[1].group(|ui| {
-                            ui.heading("Design Offset");
-                            ui.add_space(4.0);
-                            
-                            let mut design_changed = false;
-                            let old_design_x = self.design_offset.x;
-                            let old_design_y = self.design_offset.y;
-                            
-                            ui.horizontal(|ui| {
-                                ui.label("X:");
-                                if ui.add(egui::DragValue::new(&mut self.design_offset.x).speed(0.1)).changed() {
-                                    design_changed = true;
-                                }
-                            });
-                            ui.horizontal(|ui| {
-                                ui.label("Y:");
-                                if ui.add(egui::DragValue::new(&mut self.design_offset.y).speed(0.1)).changed() {
-                                    design_changed = true;
-                                }
-                            });
-                            
-                            if design_changed {
-                                logger.log_custom(
-                                    Self::LOG_TYPE_DESIGN_OFFSET,
-                                    &format!("Design offset changed from ({:.1}, {:.1}) to ({:.1}, {:.1})", 
-                                            old_design_x, old_design_y, self.design_offset.x, self.design_offset.y)
-                                );
-                            }
-                        });
-                    });
-                });
-            
-            ui.separator();
-            
-            // Design Rule Check section
-            ui.horizontal(|ui| {
-                ui.heading("Design Rule Check");
-                
-                // Add some spacing to push the button to the right
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button("🔍 Run DRC").clicked() {
-                        // Check if a ruleset is loaded
-                        if let Some(ref ruleset) = self.current_drc_ruleset {
-                            // Simulate DRC process with INFO messages
-                            logger.log_info("Starting Design Rule Check");
-                            logger.log_info(&format!("Using {} ruleset", ruleset));
-                            logger.log_info("Analyzing Gerber files");
-                            logger.log_info("Checking trace widths");
-                            logger.log_info("Checking via sizes");
-                            logger.log_info("Checking spacing rules");
-                            logger.log_info("Checking drill sizes");
-                            logger.log_info("Issues found: None");
-                            logger.log_info("DRC analysis completed successfully");
-                        } else {
-                            logger.log_warning("Cannot run DRC: No ruleset loaded");
-                            logger.log_info("Please select a PCB manufacturer ruleset first");
-                        }
-                    }
-                });
-            });
-            ui.add_space(4.0);
-            
-            egui::CollapsingHeader::new("PCB Manufacturer Rules")
-                .default_open(false)
-                .show(ui, |ui| {
-                    ui.add_space(4.0);
-                    
-                    // Current ruleset display
-                    if let Some(ref ruleset) = self.current_drc_ruleset {
-                        ui.horizontal(|ui| {
-                            ui.label("Current ruleset:");
-                            ui.label(egui::RichText::new(ruleset).strong().color(egui::Color32::from_rgb(46, 204, 113)));
-                        });
-                        ui.add_space(4.0);
-                    } else {
-                        ui.label(egui::RichText::new("No DRC ruleset loaded").color(egui::Color32::from_rgb(231, 76, 60)));
-                        ui.add_space(4.0);
-                    }
-                    
-                    // PCB Manufacturer buttons
-                    ui.vertical(|ui| {
-                        if ui.button("🏭 JLC PCB Rules").clicked() {
-                            self.current_drc_ruleset = Some("JLC PCB".to_string());
-                            logger.log_custom(
-                                Self::LOG_TYPE_DRC,
-                                "Loaded JLC PCB Design Rule Check ruleset"
-                            );
-                        }
-                        
-                        if ui.button("🏭 PCB WAY Rules").clicked() {
-                            self.current_drc_ruleset = Some("PCB WAY".to_string());
-                            logger.log_custom(
-                                Self::LOG_TYPE_DRC,
-                                "Loaded PCB WAY Design Rule Check ruleset"
-                            );
-                        }
-                        
-                        if ui.button("🏭 Advanced Circuits Rules").clicked() {
-                            self.current_drc_ruleset = Some("Advanced Circuits".to_string());
-                            logger.log_custom(
-                                Self::LOG_TYPE_DRC,
-                                "Loaded Advanced Circuits Design Rule Check ruleset"
-                            );
-                        }
-                        
-                        ui.add_space(4.0);
-                        
-                        // Clear ruleset button
-                        if self.current_drc_ruleset.is_some() {
-                            if ui.button("🗑 Clear Ruleset").clicked() {
-                                if let Some(ref ruleset) = self.current_drc_ruleset {
-                                    logger.log_custom(
-                                        Self::LOG_TYPE_DRC,
-                                        &format!("Cleared {} Design Rule Check ruleset", ruleset)
-                                    );
-                                }
-                                self.current_drc_ruleset = None;
-                            }
-                        }
-                    });
-                });
-            
-            ui.separator();
-            
-            // Grid Settings section
-            ui.heading("Grid Settings");
-            ui.add_space(4.0);
-            
-            let prev_grid_enabled = self.grid_enabled;
-            if ui.checkbox(&mut self.grid_enabled, "Enable Grid").changed() {
-                logger.log_custom(
-                    Self::LOG_TYPE_GRID,
-                    &format!("Grid display {}", if self.grid_enabled { "enabled" } else { "disabled" })
-                );
-            }
-            
-            ui.horizontal(|ui| {
-                ui.label("Grid Spacing (mils):");
-                let prev_spacing = self.grid_spacing_mils;
-                
-                // Add slider
-                let slider_response = ui.add(
-                    egui::Slider::new(&mut self.grid_spacing_mils, 1.0..=1000.0)
-                        .logarithmic(true)
-                );
-                
-                // Add text input box next to slider
-                let text_response = ui.add(
-                    egui::DragValue::new(&mut self.grid_spacing_mils)
-                        .speed(1.0)
-                        .range(1.0..=1000.0)
-                        .suffix(" mils")
-                );
-                
-                if slider_response.changed() || text_response.changed() {
-                    logger.log_custom(
-                        Self::LOG_TYPE_GRID,
-                        &format!("Grid spacing changed from {:.1} to {:.1} mils", prev_spacing, self.grid_spacing_mils)
-                    );
-                }
-            });
-            
-            ui.horizontal(|ui| {
-                ui.label("Grid Dot Size:");
-                let prev_dot_size = self.grid_dot_size;
-                if ui.add(egui::Slider::new(&mut self.grid_dot_size, 0.5..=5.0)).changed() {
-                    logger.log_custom(
-                        Self::LOG_TYPE_GRID,
-                        &format!("Grid dot size changed from {:.1} to {:.1}", prev_dot_size, self.grid_dot_size)
-                    );
-                }
-            });
-            
-            // Show grid visibility status
-            if self.grid_enabled {
-                let grid_spacing_gerber = self.grid_spacing_mils as f64 * 0.001;
-                let grid_spacing_screen = grid_spacing_gerber * self.view_state.scale as f64;
-                
-                if grid_spacing_screen < 5.0 {
-                    ui.colored_label(egui::Color32::from_rgb(255, 165, 0), 
-                        egui::RichText::new("⚠ Grid too fine to display - zoom in or increase spacing").small());
-                } else if grid_spacing_screen > 300.0 {
-                    ui.colored_label(egui::Color32::from_rgb(255, 165, 0), 
-                        egui::RichText::new("⚠ Grid too coarse - zoom out or decrease spacing").small());
-                } else {
-                    ui.colored_label(egui::Color32::from_rgb(0, 255, 0), 
-                        egui::RichText::new(format!("✓ Grid visible (~{:.0} pixels)", grid_spacing_screen)).small());
-                }
-            }
-            
-            ui.separator();
-            ui.heading("Event Log");
-            // Display the logger
-            logger.show(ui);
-        });
+        // Show the properties panel using our modular UI
+        ui::show_properties_panel(ctx, self);
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.centered_and_justified(|ui| {
@@ -1001,9 +459,7 @@ impl eframe::App for DemoLensApp {
                     let painter = ui.painter().with_clip_rect(viewport);
                     
                     // Draw grid if enabled (before other elements so it appears underneath)
-                    if self.grid_enabled {
-                        self.draw_grid(&painter, &viewport);
-                    }
+                    grid::draw_grid(&painter, &viewport, &self.view_state, &self.grid_settings);
                     
                     draw_crosshair(&painter, self.ui_state.origin_screen_pos, Color32::BLUE);
                     draw_crosshair(&painter, self.ui_state.center_screen_pos, Color32::LIGHT_GRAY);
@@ -1013,11 +469,7 @@ impl eframe::App for DemoLensApp {
                         if let Some(layer_info) = self.layers.get(&layer_type) {
                             if layer_info.visible {
                                 // Filter based on showing_top
-                                let should_render = match layer_type {
-                                    LayerType::TopCopper | LayerType::TopSilk | LayerType::TopSoldermask => self.showing_top,
-                                    LayerType::BottomCopper | LayerType::BottomSilk | LayerType::BottomSoldermask => !self.showing_top,
-                                    LayerType::MechanicalOutline => true, // Always show outline
-                                };
+                                let should_render = layer_type.should_render(self.showing_top);
                                 
                                 if should_render {
                                     // Use the layer's specific gerber data if available, otherwise fall back to demo
