@@ -1,4 +1,5 @@
 /target
 /demo/target
 /demo_lens/target
+/demo_multi_view/target
 /Cargo.lock
