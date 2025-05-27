@@ -105,7 +105,7 @@ impl Transform2D {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct BoundingBox {
     pub min: Position,
     pub max: Position,
@@ -131,6 +131,14 @@ impl Default for BoundingBox {
 }
 
 impl BoundingBox {
+    /// Note that a bounding box of 0,0 -> 0,0 is NOT empty
+    /// e.g., you could have a shape that defines a rectangle with an origin of 0,0 and a width + height of 0,0.
+    ///
+    /// Only a bounding box which is the same as the one returned by `default` counts as empty.
+    pub fn is_empty(&self) -> bool {
+        self.eq(&BoundingBox::default())
+    }
+
     pub fn width(&self) -> f64 {
         self.max.x - self.min.x
     }
@@ -244,6 +252,14 @@ mod bbox_tests {
     use super::BoundingBox;
     use crate::Position;
     use crate::position::Vector;
+
+    #[rstest]
+    #[case(BoundingBox::default(), true)]
+    #[case(BoundingBox { min: Position::new(0.0, 0.0), max: Position::new(0.0, 0.0) }, false)]
+    #[case(BoundingBox { min: Position::new(-10.0, -10.0), max: Position::new(10.0, 10.0) }, false)]
+    pub fn test_is_empty(#[case] input: BoundingBox, #[case] expected: bool) {
+        assert_eq!(input.is_empty(), expected);
+    }
 
     #[test]
     pub fn test_apply_rotation_90_degrees_zero_offset() {
