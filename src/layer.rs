@@ -39,8 +39,21 @@ impl GerberLayer {
         }
     }
 
+    /// It's possible to have a gerber file with no primitives
+    pub fn is_empty(&self) -> bool {
+        self.bounding_box.is_empty()
+    }
+
     pub fn bounding_box(&self) -> &BoundingBox {
         &self.bounding_box
+    }
+
+    /// Return the bounding box if the gerber file resulted in primitives which need drawing.
+    pub fn try_bounding_box(&self) -> Option<&BoundingBox> {
+        match self.is_empty() {
+            true => None,
+            false => Some(&self.bounding_box),
+        }
     }
 
     pub fn primitives(&self) -> &[GerberPrimitive] {
