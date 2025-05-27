@@ -4,8 +4,8 @@ use eframe::emath::{Rect, Vec2};
 use eframe::epaint::Color32;
 use egui::ViewportBuilder;
 use gerber_viewer::gerber_parser::parse;
-use gerber_viewer::{draw_arrow, draw_outline, draw_crosshair, BoundingBox, GerberLayer, GerberRenderer, Transform2D, ViewState, Mirroring, draw_marker, UiState};
-use gerber_viewer::position::{Position, Vector};
+use gerber_viewer::{draw_arrow, draw_outline, draw_crosshair, BoundingBox, GerberLayer, GerberRenderer, Transform2D, ViewState, draw_marker, UiState};
+use gerber_viewer::position::Vector;
 
 const ENABLE_UNIQUE_SHAPE_COLORS: bool = true;
 const ENABLE_POLYGON_NUMBERING: bool = false;
@@ -143,10 +143,20 @@ impl eframe::App for DemoApp {
         let outline_vertices_screen = outline_vertices.into_iter()
             .map(|v| self.view_state.gerber_to_screen_coords(v))
             .collect::<Vec<_>>();
-        
+
         //
         // Build a UI
         //
+
+        egui::TopBottomPanel::top("top_panel")
+            .resizable(true)
+            .show(ctx, |ui| {
+            ui.heading("Gerber Viewer Demo");
+            ui.label("by Dominic Clifton (2025)");
+
+            ui.label("Pan by using left-mouse button + drag, zoom using scroll wheel.");
+        });
+
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.centered_and_justified(|ui| {
                 let response = ui.allocate_rect(ui.available_rect_before_wrap(), egui::Sense::drag());
