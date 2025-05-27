@@ -17,7 +17,7 @@ impl UiState {
     pub fn update(&mut self, ui: &Ui, viewport: &Rect, response: &Response, view_state: &mut ViewState) {
         self.update_cursor_position(view_state, &response, ui);
         self.handle_panning(view_state, &response, ui);
-        self.handle_zooming(view_state, &response, viewport, ui);
+        self.handle_zooming(view_state, &response, ui);
 
         self.center_screen_pos = viewport.center();
         self.origin_screen_pos = view_state.gerber_to_screen_coords(Position::ZERO);
@@ -43,7 +43,7 @@ impl UiState {
         }
     }
 
-    pub fn handle_zooming(&mut self, view_state: &mut ViewState, response: &Response, viewport: &Rect, ui: &Ui) {
+    pub fn handle_zooming(&mut self, view_state: &mut ViewState, response: &Response, ui: &Ui) {
         // Only process zoom if the mouse pointer is actually over the viewport
         if !response.hovered() {
             return;
@@ -60,10 +60,9 @@ impl UiState {
                 old_scale / zoom_factor
             };
 
-            if let Some(mouse_pos) = response.hover_pos() {
-                let mouse_pos = mouse_pos - viewport.min.to_vec2();
-                let mouse_world = (mouse_pos - view_state.translation) / old_scale;
-                view_state.translation = mouse_pos - mouse_world * new_scale;
+            if let Some(hover_pos) = response.hover_pos() {
+                let mouse_world = (hover_pos - view_state.translation) / old_scale;
+                view_state.translation = hover_pos - mouse_world * new_scale;
             }
 
             view_state.scale = new_scale;
