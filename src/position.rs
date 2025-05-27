@@ -83,6 +83,7 @@ macro_rules! impl_consts {
             pub const ZERO: $name = $name::new(0.0, 0.0);
             pub const MAX: $name = $name::new(<$t>::MAX, <$t>::MAX);
             pub const MIN: $name = $name::new(<$t>::MIN, <$t>::MIN);
+            pub const INFINITY: $name = $name::new(<$t>::INFINITY, <$t>::INFINITY);
         }
 
         impl Default for $name {
