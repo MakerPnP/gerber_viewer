@@ -30,9 +30,23 @@ cd demo
 cargo run --release
 ```
 
-See `demo/src/main` and `demo/Cargo.toml` for a complete example.
+See `demo/src/main.rs` and `demo/Cargo.toml` for details.
 
-![screenshot_2025-05-05_155658.png](demo/assets/screenshot_2025-05-05_155658.png)
+Screenshot:
+
+![screenshot_2025-05-27_145315.png](assets/makerpnp_gerber_viewer/screenshots/screenshot_2025-05-27_145315.png)
+
+Red box = Axis aligned bounding box.
+Green box = layer bounding box.
+Blue cross-hair = Gerber 0,0 origin.
+White cross-hair = Viewport center.
+Orange line and point = Design offset.
+Purple point = Design origin.
+Single gerber layer rendered with individual shape coloring debug mode enabled.
+
+Video:
+![recording_2025-05-27_145242.gif](assets/makerpnp_gerber_viewer/screenshots/recording_2025-05-27_145242.gif)
+
 
 ## Rendering
 
@@ -66,6 +80,16 @@ is currently the driving force for upcoming changes.
 | ❌        | Block aperture (AB)                  |
 | ❌        | File attributes (TF)                 |
 | ❌        | Aperture attributes (TA)             |
+
+### Other UI/Rendering features
+
+| Supported | Feature                                    |
+|----------|--------------------------------------------|
+| ✅        | Rotation of layer with user-defined origin |
+| ✅        | Mirroring of layer                         |
+| ✅        | X/Y Offset of layer                        |
+| ✅        | Debug modes                                |
+
 
 The above list is likely sufficient for viewing most modern PCB gerber files, the macro support is a key feature.
 
