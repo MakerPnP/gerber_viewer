@@ -2,7 +2,6 @@ use std::io::BufReader;
 
 use eframe::emath::{Rect, Vec2};
 use eframe::epaint::Color32;
-use egui::ViewportBuilder;
 
 /// egui_lens imports
 use egui_lens::{ReactiveEventLogger, ReactiveEventLoggerState, LogColors};
@@ -16,7 +15,7 @@ use std::collections::HashMap;
 
 // Import platform modules
 mod platform;
-use platform::{banner, details};
+use platform::{banner, details, parameters::gui };
 
 // Import new modules
 mod constants;
@@ -48,6 +47,7 @@ pub struct DemoLensApp {
     pub view_state: ViewState,
     pub ui_state: UiState,
     pub needs_initial_view: bool,
+    pub frame_count: u32,
 
     pub rotation_degrees: f32,
     
@@ -258,6 +258,7 @@ impl DemoLensApp {
             gerber_layer,
             view_state: Default::default(),
             needs_initial_view: true,
+            frame_count: 0,
             rotation_degrees: 0.0,
             ui_state: Default::default(),
             
@@ -367,7 +368,7 @@ impl DemoLensApp {
 /// state. The `update` method is where most of the application logic resides.
 /// 
 impl eframe::App for DemoLensApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
         // Create a logger for this frame
         let _logger = ReactiveEventLogger::with_colors(&self.logger_state, &self.log_colors);
         
@@ -439,8 +440,16 @@ impl eframe::App for DemoLensApp {
                     let response = ui.allocate_rect(ui.available_rect_before_wrap(), egui::Sense::drag());
                     let viewport = response.rect;
 
-                    if self.needs_initial_view {
-                        self.reset_view(viewport)
+                    // Increment frame counter
+                    self.frame_count += 1;
+
+                    // Center the view after 3 frames to ensure window is fully initialized
+                    if self.needs_initial_view && self.frame_count >= 3 {
+                        self.reset_view(viewport);
+                        
+                        // Log that we've centered the view
+                        let logger = ReactiveEventLogger::with_colors(&self.logger_state, &self.log_colors);
+                        logger.log_info("View centered and initialized");
                     }
                     
                     //
@@ -532,12 +541,22 @@ impl eframe::App for DemoLensApp {
 /// and runs the application using the `eframe` framework.
 fn main() -> eframe::Result<()> {
     env_logger::init(); // Log to stderr (optional).
+
+    let native_options = eframe::NativeOptions {
+        viewport: egui::ViewportBuilder::default()
+            .with_titlebar_buttons_shown(true)
+            .with_inner_size([gui::VIEWPORT_X, gui::VIEWPORT_Y])
+            .with_min_inner_size([800.0, 600.0])  // Use smaller min size
+            .with_max_inner_size([gui::VIEWPORT_X, gui::VIEWPORT_Y])
+            .with_resizable(true)
+            .with_maximized(false)  // Ensure it's not maximized
+            .with_fullscreen(false), // Ensure it's not fullscreen
+        ..Default::default()
+    };
+
     eframe::run_native(
-        "Gerber Viewer Lens Demo (egui)",
-        eframe::NativeOptions {
-            viewport: ViewportBuilder::default().with_inner_size([1280.0, 768.0]),
-            ..Default::default()
-        },
+        "Gerber Viewer Demo with egui_lens",
+        native_options,
         Box::new(|_cc| Ok(Box::new(DemoLensApp::new()))),
     )
 }
