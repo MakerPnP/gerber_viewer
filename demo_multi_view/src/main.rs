@@ -10,12 +10,8 @@ use egui_lens::{ReactiveEventLogger, ReactiveEventLoggerState, LogColors};
 /// Use of prelude for egui_mobius_reactive
 use egui_mobius_reactive::*; 
 
+use gerber_viewer::prelude::*;
 use gerber_viewer::gerber_parser::parse;
-use gerber_viewer::{
-    draw_arrow, draw_outline, draw_crosshair, BoundingBox, GerberLayer, GerberRenderer, 
-    Transform2D, ViewState, Mirroring, draw_marker, UiState
-};
-use gerber_viewer::position::Vector;
 use std::collections::HashMap;
 
 // Import platform modules

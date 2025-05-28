@@ -7,7 +7,7 @@ authors = ["James Bonanno <atlantix-eda@proton.me>"]
 [dependencies]
 egui = "0.31.1"
 eframe = "0.31.1"
-gerber_viewer = { git = "https://github.com/MakerPnP/gerber_viewer", features = ["egui", "parser", "types"] }
+gerber_viewer = { path = "..", features = ["egui", "parser", "types"] }
 egui_lens = { version = "0.1.0"}
 egui_mobius_reactive = { version = "0.3.0-alpha.31" }
 egui_mobius = { version = "0.3.0-alpha.31" }
