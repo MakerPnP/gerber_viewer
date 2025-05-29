@@ -1,10 +1,10 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use egui::Pos2;
 #[cfg(feature = "egui")]
 use egui::epaint::emath::Vec2;
-use log::{debug, error, trace, warn};
+use log::{debug, error, info, trace, warn};
 
 use super::expressions::{
     ExpressionEvaluationError, MacroContext, evaluate_expression, macro_boolean_to_bool, macro_decimal_pair_to_f64,
@@ -143,7 +143,7 @@ impl GerberLayer {
             }
         }
 
-        debug!("layer bbox: {:?}", bbox);
+        trace!("layer bbox: {:?}", bbox);
 
         bbox
     }
@@ -243,12 +243,12 @@ impl GerberLayer {
                                 }
                             }
 
-                            debug!("macro_context: {:?}", macro_context);
+                            trace!("initial macro_context: {:?}", macro_context);
 
                             let mut primitive_defs = vec![];
 
                             for content in &macro_def.content {
-                                debug!("content: {:?}", content);
+                                trace!("macro_content: {:?}", content);
 
                                 fn process_content(
                                     content: &MacroContent,
@@ -516,8 +516,9 @@ impl GerberLayer {
                                     Ok(None) => {}
                                 }
                             }
+                            trace!("final macro_context: {:?}", macro_context);
 
-                            debug!("primitive_defs: {:?}", primitive_defs);
+                            trace!("primitive_defs: {:?}", primitive_defs);
 
                             apertures.insert(*code, ApertureKind::Macro(primitive_defs));
                         } else {
@@ -533,14 +534,19 @@ impl GerberLayer {
                 }
             }
         }
+        info!("macros: {:?}", macro_definitions.len());
 
-        trace!("apertures: {:?}", apertures);
+        debug!("aperture codes: {:?}", apertures.keys());
+        info!("apertures: {:?}", apertures.len());
 
         // Third pass: collect all primitives, handle regions
 
         let mut layer_primitives = Vec::new();
         let mut current_aperture = None;
         let mut current_pos = Position::ZERO;
+
+        // also record aperture selection errors
+        let mut aperture_selection_errors: HashSet<i32> = HashSet::new();
 
         // regions are a special case - they are defined by aperture codes
         let mut current_region_vertices: Vec<Position> = Vec::new();
@@ -616,10 +622,7 @@ impl GerberLayer {
                 Command::FunctionCode(FunctionCode::DCode(DCode::SelectAperture(code))) => {
                     current_aperture = apertures.get(&code);
                     if current_aperture.is_none() {
-                        error!(
-                            "Selecting aperture failed; Check gerber file content and parser errors. aperture_code: {:?}",
-                            code
-                        );
+                        aperture_selection_errors.insert(*code);
                     }
                 }
                 Command::FunctionCode(FunctionCode::DCode(DCode::Operation(operation))) => {
@@ -701,7 +704,7 @@ impl GerberLayer {
                                                         *end += current_pos;
                                                     }
                                                 }
-                                                debug!("flashing macro primitive: {:?}", primitive);
+                                                trace!("flashing macro primitive: {:?}", primitive);
                                                 layer_primitives.push(primitive);
                                             }
                                         }
@@ -820,6 +823,15 @@ impl GerberLayer {
             }
         }
 
+        if aperture_selection_errors.len() > 0 {
+            error!(
+                "Selecting some apertures failed; Check gerber file content and parser errors. aperture_codes: {:?}",
+                aperture_selection_errors
+            );
+        }
+
+        info!("layer_primitives: {:?}", layer_primitives.len());
+
         layer_primitives
     }
 }
@@ -881,7 +893,7 @@ impl GerberPolygon {
 
 impl GerberPrimitive {
     fn new_polygon(polygon: GerberPolygon) -> Self {
-        debug!("new_polygon: {:?}", polygon);
+        trace!("new_polygon: {:?}", polygon);
         let is_convex = polygon.is_convex();
         let mut relative_vertices = polygon.vertices;
 
@@ -912,7 +924,7 @@ impl GerberPrimitive {
             }),
         };
 
-        debug!("polygon: {:?}", polygon);
+        trace!("polygon: {:?}", polygon);
 
         polygon
     }
