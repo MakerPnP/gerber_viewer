@@ -1307,7 +1307,7 @@ dependencies = [
 [[package]]
 name = "gerber_parser"
 version = "0.2.0"
-source = "git+https://github.com/makerpnp/gerber-parser-makerpnp.git?rev=57bc652fce7265ceb00d197b180bcef31d701e3b#57bc652fce7265ceb00d197b180bcef31d701e3b"
+source = "git+https://github.com/makerpnp/gerber-parser-makerpnp.git?rev=83c4bba9e9062dda36838e418d5cf36a73d9a70e#83c4bba9e9062dda36838e418d5cf36a73d9a70e"
 dependencies = [
  "gerber-types",
  "lazy-regex",

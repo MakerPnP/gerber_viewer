@@ -12,7 +12,8 @@ egui = { version = "0.31.1", optional = true }
 gerber-types = { git = "https://github.com/makerpnp/gerber-types-rs.git", rev = "41b8ab178fb6ee646dfba3f000db1b1b8a9ae167"}
 
 # Gerber parser (optional, see README.md)
-gerber_parser = { git = "https://github.com/makerpnp/gerber-parser-makerpnp.git", rev = "57bc652fce7265ceb00d197b180bcef31d701e3b", optional = true }
+gerber_parser = { git = "https://github.com/makerpnp/gerber-parser-makerpnp.git", rev = "83c4bba9e9062dda36838e418d5cf36a73d9a70e", optional = true }
+#gerber_parser = { path = "../../../libraries/rust/gerber-parser", optional = true }
 
 # Math
 rand = "0.9.1"
