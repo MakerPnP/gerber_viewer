@@ -4,7 +4,7 @@ use std::sync::Arc;
 use egui::Pos2;
 #[cfg(feature = "egui")]
 use egui::epaint::emath::Vec2;
-use log::{debug, error, warn};
+use log::{debug, error, trace, warn};
 
 use super::expressions::{
     ExpressionEvaluationError, MacroContext, evaluate_expression, macro_boolean_to_bool, macro_decimal_pair_to_f64,
@@ -534,6 +534,8 @@ impl GerberLayer {
             }
         }
 
+        trace!("apertures: {:?}", apertures);
+
         // Third pass: collect all primitives, handle regions
 
         let mut layer_primitives = Vec::new();
@@ -613,6 +615,12 @@ impl GerberLayer {
 
                 Command::FunctionCode(FunctionCode::DCode(DCode::SelectAperture(code))) => {
                     current_aperture = apertures.get(&code);
+                    if current_aperture.is_none() {
+                        error!(
+                            "Selecting aperture failed; Check gerber file content and parser errors. aperture_code: {:?}",
+                            code
+                        );
+                    }
                 }
                 Command::FunctionCode(FunctionCode::DCode(DCode::Operation(operation))) => {
                     match operation {
