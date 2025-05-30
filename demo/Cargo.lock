@@ -712,15 +712,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "conv"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78ff10625fd0ac447827aa30ea8b861fead473bb60aeb73af6c1c58caf0d1299"
-dependencies = [
- "custom_derive",
-]
-
-[[package]]
 name = "core-foundation"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -809,12 +800,6 @@ name = "cursor-icon"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96a6ac251f4a2aca6b3f91340350eab87ae57c3f127ffeb585e92bd336717991"
-
-[[package]]
-name = "custom_derive"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef8ae57c4978a2acd8b869ce6b9ca1dfe817bff704c220209fdef2c0b75a01b9"
 
 [[package]]
 name = "digest"
@@ -1295,10 +1280,9 @@ dependencies = [
 [[package]]
 name = "gerber-types"
 version = "0.4.0"
-source = "git+https://github.com/makerpnp/gerber-types-rs.git?rev=41b8ab178fb6ee646dfba3f000db1b1b8a9ae167#41b8ab178fb6ee646dfba3f000db1b1b8a9ae167"
+source = "git+https://github.com/makerpnp/gerber-types-rs.git?rev=e48e1653e581f8ab66cd860f0c0e401764c95cc2#e48e1653e581f8ab66cd860f0c0e401764c95cc2"
 dependencies = [
  "chrono",
- "conv",
  "num-rational",
  "thiserror 2.0.12",
  "uuid",
@@ -1307,7 +1291,7 @@ dependencies = [
 [[package]]
 name = "gerber_parser"
 version = "0.2.0"
-source = "git+https://github.com/makerpnp/gerber-parser-makerpnp.git?rev=43c7d853504a0a19aa32ec8208ba886929eb4694#43c7d853504a0a19aa32ec8208ba886929eb4694"
+source = "git+https://github.com/makerpnp/gerber-parser-makerpnp.git?rev=6edd83b11114d9bdf0276020e965ab2d25c2bbe5#6edd83b11114d9bdf0276020e965ab2d25c2bbe5"
 dependencies = [
  "gerber-types",
  "lazy-regex",

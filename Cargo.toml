@@ -9,10 +9,10 @@ authors = ["Dominic Clifton <me@dominicclifton.name>"]
 egui = { version = "0.31.1", optional = true }
 
 # Gerber files
-gerber-types = { git = "https://github.com/makerpnp/gerber-types-rs.git", rev = "41b8ab178fb6ee646dfba3f000db1b1b8a9ae167"}
+gerber-types = { git = "https://github.com/makerpnp/gerber-types-rs.git", rev = "e48e1653e581f8ab66cd860f0c0e401764c95cc2"}
 
 # Gerber parser (optional, see README.md)
-gerber_parser = { git = "https://github.com/makerpnp/gerber-parser-makerpnp.git", rev = "43c7d853504a0a19aa32ec8208ba886929eb4694", optional = true }
+gerber_parser = { git = "https://github.com/makerpnp/gerber-parser-makerpnp.git", rev = "6edd83b11114d9bdf0276020e965ab2d25c2bbe5", optional = true }
 #gerber_parser = { path = "../../../libraries/rust/gerber-parser", optional = true }
 
 # Math
