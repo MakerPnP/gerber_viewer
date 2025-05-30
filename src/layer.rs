@@ -19,6 +19,7 @@ use super::position::deduplicate::DedupEpsilon;
 use super::{Exposure, Position, Winding};
 use super::{calculate_winding, geometry, gerber_types};
 
+#[derive(Clone, Debug)]
 pub struct GerberLayer {
     /// Storing the commands, soon we'll want to tag the primitives with the `Command` used to build them.
     #[allow(unused)]
