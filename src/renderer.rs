@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use egui::epaint::emath::Align2;
-use egui::epaint::{Color32, FontId, Mesh, Pos2, Rect, Shape, Stroke, StrokeKind, Vec2, Vertex};
+use egui::epaint::{
+    Color32, ColorMode, FontId, Mesh, PathShape, PathStroke, Pos2, Rect, Shape, Stroke, StrokeKind, Vec2, Vertex,
+};
 
 use crate::Transform2D;
 use crate::layer::{GerberPrimitive, ViewState};
@@ -152,6 +154,60 @@ impl GerberRenderer {
                     let radius = (*width as f32 / 2.0) * view.scale;
                     painter.circle(start_position.to_pos2(), radius, color, Stroke::NONE);
                     painter.circle(end_position.to_pos2(), radius, color, Stroke::NONE);
+                }
+                GerberPrimitive::Arc {
+                    center,
+                    radius,
+                    width,
+                    start_angle,
+                    sweep_angle,
+                    exposure,
+                } => {
+                    let color = exposure.to_color(&color);
+                    let screen_center = Pos2::new(center.x as f32, -(center.y as f32));
+
+                    // Check if this is a full circle
+                    let is_full_circle = (sweep_angle.abs() - 2.0 * std::f64::consts::PI).abs() < f64::EPSILON;
+
+                    let steps = if is_full_circle { 33 } else { 32 };
+                    let mut points = Vec::with_capacity(steps);
+
+                    let effective_sweep = if is_full_circle {
+                        2.0 * std::f64::consts::PI
+                    } else {
+                        *sweep_angle
+                    };
+
+                    let angle_step = effective_sweep / (steps - 1) as f64;
+
+                    // Generate points along the outer radius
+                    for i in 0..steps {
+                        let angle = start_angle + angle_step * i as f64;
+                        let x = *radius * angle.cos();
+                        let y = *radius * angle.sin();
+
+                        let local = Vec2::new(x as f32, -y as f32);
+                        let position =
+                            (view.translation + transform.apply_to_pos2(screen_center + local) * view.scale).to_pos2();
+
+                        points.push(position);
+                    }
+
+                    // Ensure exact closure for full circles
+                    if is_full_circle {
+                        points[steps - 1] = points[0];
+                    }
+
+                    painter.add(Shape::Path(PathShape {
+                        points,
+                        closed: is_full_circle,
+                        fill: Color32::TRANSPARENT,
+                        stroke: PathStroke {
+                            width: *width as f32 * view.scale,
+                            color: ColorMode::Solid(color),
+                            kind: StrokeKind::Inside,
+                        },
+                    }));
                 }
                 GerberPrimitive::Polygon {
                     center,

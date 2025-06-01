@@ -4,6 +4,7 @@ use std::sync::Arc;
 use egui::Pos2;
 #[cfg(feature = "egui")]
 use egui::epaint::emath::Vec2;
+use gerber_types::Circle;
 use log::{debug, error, info, trace, warn};
 
 use super::expressions::{
@@ -93,6 +94,33 @@ impl GerberLayer {
                     bbox.min.y = bbox.min.y.min(center.y - radius);
                     bbox.max.x = bbox.max.x.max(center.x + radius);
                     bbox.max.y = bbox.max.y.max(center.y + radius);
+                }
+                GerberPrimitive::Arc {
+                    center,
+                    radius,
+                    width,
+                    start_angle,
+                    sweep_angle,
+                    ..
+                } => {
+                    let half_width = width / 2.0;
+
+                    // Sample points along the arc to find extremes
+                    let steps = 32;
+                    let angle_step = sweep_angle / (steps - 1) as f64;
+
+                    // Sample all points including the first one
+                    for i in 0..steps {
+                        let angle = start_angle + angle_step * i as f64;
+                        let x = center.x + radius * angle.cos();
+                        let y = center.y + radius * angle.sin();
+
+                        // Update bounding box with stroke width
+                        bbox.min.x = bbox.min.x.min(x - half_width);
+                        bbox.min.y = bbox.min.y.min(y - half_width);
+                        bbox.max.x = bbox.max.x.max(x + half_width);
+                        bbox.max.y = bbox.max.y.max(y + half_width);
+                    }
                 }
                 GerberPrimitive::Rectangle {
                     origin,
@@ -691,6 +719,11 @@ impl GerberLayer {
                                                     } => {
                                                         *center += current_pos;
                                                     }
+                                                    GerberPrimitive::Arc {
+                                                        center, ..
+                                                    } => {
+                                                        *center += current_pos;
+                                                    }
                                                     GerberPrimitive::Rectangle {
                                                         origin, ..
                                                     } => {
@@ -711,13 +744,30 @@ impl GerberLayer {
                                         }
                                         ApertureKind::Standard(aperture) => {
                                             match aperture {
-                                                Aperture::Circle(circle) => {
-                                                    layer_primitives.push(GerberPrimitive::Circle {
-                                                        center: current_pos,
-                                                        diameter: circle.diameter,
-                                                        exposure: Exposure::Add,
-                                                    });
+                                                Aperture::Circle(Circle {
+                                                    diameter,
+                                                    hole_diameter,
+                                                }) => {
+                                                    let primitive = if let Some(hole_dia) = hole_diameter {
+                                                        GerberPrimitive::Arc {
+                                                            center: current_pos,
+                                                            radius: (*diameter - *hole_dia) / 2.0,
+                                                            width: *hole_dia,
+                                                            start_angle: 0.0,
+                                                            sweep_angle: 2.0 * std::f64::consts::PI, // Full circle, clockwise
+                                                            exposure: Exposure::Add,
+                                                        }
+                                                    } else {
+                                                        GerberPrimitive::Circle {
+                                                            center: current_pos,
+                                                            diameter: *diameter,
+                                                            exposure: Exposure::Add,
+                                                        }
+                                                    };
+
+                                                    layer_primitives.push(primitive);
                                                 }
+
                                                 Aperture::Rectangle(rect) => {
                                                     layer_primitives.push(GerberPrimitive::Rectangle {
                                                         origin: Position::new(
@@ -867,6 +917,14 @@ pub enum GerberPrimitive {
         center: Position,
         exposure: Exposure,
         geometry: Arc<PolygonGeometry>,
+    },
+    Arc {
+        center: Position,
+        radius: f64,
+        width: f64,
+        start_angle: f64, // in radians
+        sweep_angle: f64, // in radians, positive = clockwise
+        exposure: Exposure,
     },
 }
 
