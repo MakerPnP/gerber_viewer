@@ -93,7 +93,7 @@ macro_rules! impl_consts {
         }
     };
 }
-macro_rules! impl_ops {
+macro_rules! impl_ops_self {
     ($name:ident) => {
         impl core::ops::Add for $name {
             type Output = Self;
@@ -233,15 +233,79 @@ macro_rules! impl_invert {
     };
 }
 
+macro_rules! impl_ops_rhs {
+    ($name:ident, $t:ty) => {
+        impl $name {
+            pub const fn add_x(self, value: $t) -> Self {
+                Self {
+                    x: self.x + value,
+                    y: self.y,
+                }
+            }
+
+            pub const fn add_y(self, value: $t) -> Self {
+                Self {
+                    x: self.x,
+                    y: self.y + value,
+                }
+            }
+
+            pub const fn sub_x(self, value: $t) -> Self {
+                Self {
+                    x: self.x - value,
+                    y: self.y,
+                }
+            }
+
+            pub const fn sub_y(self, value: $t) -> Self {
+                Self {
+                    x: self.x,
+                    y: self.y - value,
+                }
+            }
+
+            pub const fn mul_x(self, value: $t) -> Self {
+                Self {
+                    x: self.x * value,
+                    y: self.y,
+                }
+            }
+
+            pub const fn mul_y(self, value: $t) -> Self {
+                Self {
+                    x: self.x,
+                    y: self.y * value,
+                }
+            }
+
+            pub const fn div_x(self, value: $t) -> Self {
+                Self {
+                    x: self.x / value,
+                    y: self.y,
+                }
+            }
+
+            pub const fn div_y(self, value: $t) -> Self {
+                Self {
+                    x: self.x,
+                    y: self.y / value,
+                }
+            }
+        }
+    };
+}
+
 impl_constructor!(Vector, f64);
 impl_consts!(Vector, f64);
 impl_invert!(Vector);
-impl_ops!(Vector);
+impl_ops_self!(Vector);
+impl_ops_rhs!(Vector, f64);
 
 impl_constructor!(Position, f64);
 impl_consts!(Position, f64);
 impl_invert!(Position);
-impl_ops!(Position);
+impl_ops_self!(Position);
+impl_ops_rhs!(Position, f64);
 
 pub mod deduplicate {
     use crate::Position;
