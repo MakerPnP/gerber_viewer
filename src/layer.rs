@@ -832,6 +832,7 @@ impl GerberLayer {
         }
 
         info!("layer_primitives: {:?}", layer_primitives.len());
+        trace!("layer_primitives: {:?}", layer_primitives);
 
         layer_primitives
     }

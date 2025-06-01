@@ -1,4 +1,5 @@
 use egui::{Pos2, Rect, Response, Ui};
+use log::trace;
 
 use crate::ViewState;
 use crate::position::Position;
@@ -21,6 +22,11 @@ impl UiState {
 
         self.center_screen_pos = viewport.center();
         self.origin_screen_pos = view_state.gerber_to_screen_coords(Position::ZERO);
+
+        trace!(
+            "update. view_state: {:?}, viewport: {:?}, cursor_gerber_coords: {:?}",
+            view_state, viewport, self.cursor_gerber_coords
+        )
     }
 
     pub fn update_cursor_position(&mut self, view_state: &ViewState, response: &Response, ui: &Ui) {
