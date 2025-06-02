@@ -39,6 +39,7 @@ struct DemoApp {
 impl DemoApp {
     pub fn new() -> Self {
         let demo_str = include_str!("../assets/demo.gbr").as_bytes();
+        //let demo_str = include_str!("../assets/diptrace-outline-test-1/BoardOutline.gbr").as_bytes();
         //let demo_str = include_str!("../assets/rectangles.gbr").as_bytes();
         //let demo_str = include_str!("../assets/macro-vectorline.gbr").as_bytes();
         //let demo_str = include_str!("../assets/macro-polygons.gbr").as_bytes();
