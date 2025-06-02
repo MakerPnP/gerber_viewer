@@ -1,0 +1,18 @@
+%TF.GenerationSoftware,HUMAN,DominicClifton,8.0.3*%
+%TF.CreationDate,2025-04-28T16:25:44+02:00*%
+%TF.SameCoordinates,Original*%
+%TF.FileFunction,Copper,L4,Bot*%
+%TF.FilePolarity,Positive*%
+%FSLAX46Y46*%
+G04 Gerber Fmt 4.6, Leading zero omitted, Abs format (unit mm)*
+%MOMM*%
+%LPD*%
+G01*
+G04 a circle made of a 360 degree arc.*
+%ADD62C,0.25*%
+D62*
+G75*
+X40000000Y0D02*
+G03*
+X40000000Y0I-40000000J0D01*
+M02*

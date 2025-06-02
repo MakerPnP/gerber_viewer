@@ -167,7 +167,7 @@ impl GerberRenderer {
                     let screen_center = Pos2::new(center.x as f32, -(center.y as f32));
 
                     // Check if this is a full circle
-                    let is_full_circle = (sweep_angle.abs() - 2.0 * std::f64::consts::PI).abs() < f64::EPSILON;
+                    let is_full_circle = GerberPrimitive::is_arc_full_circle(*start_angle, *sweep_angle);
 
                     let steps = if is_full_circle { 33 } else { 32 };
                     let mut points = Vec::with_capacity(steps);
@@ -178,11 +178,19 @@ impl GerberRenderer {
                         *sweep_angle
                     };
 
-                    let angle_step = effective_sweep / (steps - 1) as f64;
+                    // Calculate the absolute sweep for determining the step size
+                    let abs_sweep = effective_sweep.abs();
+                    let angle_step = abs_sweep / (steps - 1) as f64;
 
                     // Generate points along the outer radius
                     for i in 0..steps {
-                        let angle = start_angle + angle_step * i as f64;
+                        // Adjust the angle based on sweep direction
+                        let angle = if effective_sweep >= 0.0 {
+                            start_angle + angle_step * i as f64
+                        } else {
+                            start_angle - angle_step * i as f64
+                        };
+
                         let x = *radius * angle.cos();
                         let y = *radius * angle.sin();
 

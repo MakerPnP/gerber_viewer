@@ -105,13 +105,36 @@ impl GerberLayer {
                 } => {
                     let half_width = width / 2.0;
 
+                    // Special case: if sweep_angle is 0 or very close to 0, treat as a full circle
+                    // This handles the Gerber convention where identical start and end points indicate a full circle
+                    let actual_sweep_angle = if GerberPrimitive::is_arc_full_circle(*start_angle, *sweep_angle) {
+                        2.0 * std::f64::consts::PI
+                    } else {
+                        *sweep_angle
+                    };
+
                     // Sample points along the arc to find extremes
                     let steps = 32;
-                    let angle_step = sweep_angle / (steps - 1) as f64;
+
+                    // For negative sweep, we need to adjust our approach
+                    let abs_sweep = actual_sweep_angle.abs();
+                    let angle_step = abs_sweep / (steps - 1) as f64;
+
+                    // Always include center point in bounding box for arcs
+                    bbox.min.x = bbox.min.x.min(center.x);
+                    bbox.min.y = bbox.min.y.min(center.y);
+                    bbox.max.x = bbox.max.x.max(center.x);
+                    bbox.max.y = bbox.max.y.max(center.y);
 
                     // Sample all points including the first one
                     for i in 0..steps {
-                        let angle = start_angle + angle_step * i as f64;
+                        // For negative sweep, we need to go in the other direction
+                        let angle = if actual_sweep_angle >= 0.0 {
+                            start_angle + angle_step * i as f64
+                        } else {
+                            start_angle - angle_step * i as f64
+                        };
+
                         let x = center.x + radius * angle.cos();
                         let y = center.y + radius * angle.sin();
 
@@ -787,6 +810,21 @@ impl GerberLayer {
                                                 sweep_angle,
                                                 exposure: Exposure::Add,
                                             });
+
+                                            // draw two primitives at the ends, this can be avoided if the arc is a full circle
+                                            if !current_pos.eq(&end) {
+                                                layer_primitives.push(GerberPrimitive::Circle {
+                                                    center: current_pos,
+                                                    diameter: current_aperture_width,
+                                                    exposure: Exposure::Add,
+                                                });
+
+                                                layer_primitives.push(GerberPrimitive::Circle {
+                                                    center: end,
+                                                    diameter: current_aperture_width,
+                                                    exposure: Exposure::Add,
+                                                });
+                                            }
                                         }
                                     }
                                 }
@@ -1032,6 +1070,38 @@ pub enum GerberPrimitive {
         sweep_angle: f64, // in radians, positive = clockwise
         exposure: Exposure,
     },
+}
+
+impl GerberPrimitive {
+    /// Spec 4.7.2 "When start point and end point coincide the result is a full 360° arc"
+    ///
+    /// However, we to avoid being to strict due to rounding errors.
+    // pub fn is_arc_full_circle(start_angle: f64, sweep_angle: f64) -> bool {
+    //     const CIRCLE_TOLERANCE: f64 = 1e-10;
+    //
+    //     let is_full_circle = (start_angle - sweep_angle).abs() < CIRCLE_TOLERANCE;
+    //     is_full_circle
+    // }
+
+    pub fn is_arc_full_circle(start_angle: f64, sweep_angle: f64) -> bool {
+        // A full circle in Gerber is either:
+        // 1. Sweep angle is exactly 0 (special Gerber convention)
+        // 2. Sweep angle is exactly 2π (360 degrees)
+        const EPSILON: f64 = 1e-10;
+
+        // Check for zero sweep (Gerber convention for full circle)
+        if sweep_angle.abs() < EPSILON {
+            return true;
+        }
+
+        // Check for 2π sweep (360 degrees)
+        let normalized_sweep = (sweep_angle.abs() - 2.0 * std::f64::consts::PI).abs();
+        if normalized_sweep < EPSILON {
+            return true;
+        }
+
+        false
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -1569,5 +1639,228 @@ mod circle_aperture_tests {
             }
             _ => panic!("Expected an Arc primitive for circle with hole"),
         }
+    }
+}
+
+#[cfg(test)]
+mod bounding_box_arc_tests {
+    use std::f64::consts::{FRAC_PI_2, FRAC_PI_4, PI};
+
+    use rstest::rstest;
+
+    use super::*;
+    use crate::position::Position;
+
+    // Helper function to create a test arc
+    fn create_arc_primitive(
+        center_x: f64,
+        center_y: f64,
+        radius: f64,
+        width: f64,
+        start_angle: f64,
+        sweep_angle: f64,
+    ) -> GerberPrimitive {
+        GerberPrimitive::Arc {
+            center: Position {
+                x: center_x,
+                y: center_y,
+            },
+            radius,
+            width,
+            start_angle,
+            sweep_angle,
+            exposure: Exposure::Add,
+        }
+    }
+
+    // Test for full circles
+    #[rstest]
+    #[case(0.0, 0.0)] // start = 0, sweep = 0 (special case for full circle)
+    #[case(0.0, 2.0 * PI)] // start = 0, sweep = 2π
+    fn test_full_circle_bounds(#[case] start_angle: f64, #[case] sweep_angle: f64) {
+        // Setup
+        let center_x = 10.0;
+        let center_y = 5.0;
+        let radius = 20.0;
+        let width = 0.5;
+
+        let arc = create_arc_primitive(center_x, center_y, radius, width, start_angle, sweep_angle);
+        let primitives = vec![arc];
+
+        let bbox = GerberLayer::calculate_bounding_box(&primitives);
+
+        // For a full circle, the bounds should be center +/- (radius + half_width)
+        let half_width = width / 2.0;
+
+        // Verify the bounding box is approximately correct
+        assert!(
+            (bbox.min.x - (center_x - radius - half_width)).abs() < 1.0,
+            "min.x should be approximately {}, got {}",
+            center_x - radius - half_width,
+            bbox.min.x
+        );
+        assert!(
+            (bbox.min.y - (center_y - radius - half_width)).abs() < 1.0,
+            "min.y should be approximately {}, got {}",
+            center_y - radius - half_width,
+            bbox.min.y
+        );
+        assert!(
+            (bbox.max.x - (center_x + radius + half_width)).abs() < 1.0,
+            "max.x should be approximately {}, got {}",
+            center_x + radius + half_width,
+            bbox.max.x
+        );
+        assert!(
+            (bbox.max.y - (center_y + radius + half_width)).abs() < 1.0,
+            "max.y should be approximately {}, got {}",
+            center_y + radius + half_width,
+            bbox.max.y
+        );
+    }
+
+    // Test for partial arcs
+    #[rstest]
+    #[case(0.0, FRAC_PI_2)] // 0° to 90°
+    #[case(FRAC_PI_2, FRAC_PI_2)] // 90° to 180°
+    #[case(PI, FRAC_PI_2)] // 180° to 270°
+    #[case(PI + FRAC_PI_2, FRAC_PI_2)] // 270° to 360°
+    fn test_quarter_arc_bounds(#[case] start_angle: f64, #[case] sweep_angle: f64) {
+        // Setup
+        let center_x = 5.0;
+        let center_y = 5.0;
+        let radius = 10.0;
+        let width = 0.5;
+
+        let arc = create_arc_primitive(center_x, center_y, radius, width, start_angle, sweep_angle);
+        let primitives = vec![arc];
+
+        // Execute
+        let bbox = GerberLayer::calculate_bounding_box(&primitives);
+
+        // Verify the bounding box contains the center point plus the arc
+        let half_width = width / 2.0;
+        let total_radius = radius + half_width;
+
+        // The bounds should contain the center point
+        assert!(bbox.min.x <= center_x);
+        assert!(bbox.min.y <= center_y);
+        assert!(bbox.max.x >= center_x);
+        assert!(bbox.max.y >= center_y);
+
+        // The bounds shouldn't exceed center +/- (radius + half_width) in any direction
+        assert!(bbox.min.x >= center_x - total_radius - 0.1);
+        assert!(bbox.min.y >= center_y - total_radius - 0.1);
+        assert!(bbox.max.x <= center_x + total_radius + 0.1);
+        assert!(bbox.max.y <= center_y + total_radius + 0.1);
+
+        // Verify the bounds contain the start and end points of the arc
+        let start_x = center_x + radius * start_angle.cos();
+        let start_y = center_y + radius * start_angle.sin();
+        let end_x = center_x + radius * (start_angle + sweep_angle).cos();
+        let end_y = center_y + radius * (start_angle + sweep_angle).sin();
+
+        assert!(bbox.min.x <= start_x + 0.1);
+        assert!(bbox.min.y <= start_y + 0.1);
+        assert!(bbox.max.x >= start_x - 0.1);
+        assert!(bbox.max.y >= start_y - 0.1);
+
+        assert!(bbox.min.x <= end_x + 0.1);
+        assert!(bbox.min.y <= end_y + 0.1);
+        assert!(bbox.max.x >= end_x - 0.1);
+        assert!(bbox.max.y >= end_y - 0.1);
+    }
+
+    // Test for negative sweeps (clockwise arcs)
+    #[rstest]
+    #[case(FRAC_PI_4, -FRAC_PI_4)] // Small negative sweep
+    #[case(FRAC_PI_2, -FRAC_PI_2)] // Quarter negative sweep
+    #[case(PI, -PI)] // Half negative sweep
+    fn test_negative_sweep_arc_bounds(#[case] start_angle: f64, #[case] sweep_angle: f64) {
+        // Setup
+        let center_x = 5.0;
+        let center_y = 5.0;
+        let radius = 10.0;
+        let width = 0.5;
+
+        let arc = create_arc_primitive(center_x, center_y, radius, width, start_angle, sweep_angle);
+        let primitives = vec![arc];
+
+        // Execute
+        let bbox = GerberLayer::calculate_bounding_box(&primitives);
+
+        // Same verification as for positive sweeps
+        let half_width = width / 2.0;
+        let total_radius = radius + half_width;
+
+        // The bounds should contain the center point
+        assert!(bbox.min.x <= center_x);
+        assert!(bbox.min.y <= center_y);
+        assert!(bbox.max.x >= center_x);
+        assert!(bbox.max.y >= center_y);
+
+        // The bounds shouldn't exceed center +/- (radius + half_width) in any direction
+        assert!(bbox.min.x >= center_x - total_radius - 0.1);
+        assert!(bbox.min.y >= center_y - total_radius - 0.1);
+        assert!(bbox.max.x <= center_x + total_radius + 0.1);
+        assert!(bbox.max.y <= center_y + total_radius + 0.1);
+
+        // Verify the bounds contain the start and end points of the arc
+        let start_x = center_x + radius * start_angle.cos();
+        let start_y = center_y + radius * start_angle.sin();
+        let end_x = center_x + radius * (start_angle + sweep_angle).cos();
+        let end_y = center_y + radius * (start_angle + sweep_angle).sin();
+
+        assert!(bbox.min.x <= start_x + 0.1);
+        assert!(bbox.min.y <= start_y + 0.1);
+        assert!(bbox.max.x >= start_x - 0.1);
+        assert!(bbox.max.y >= start_y - 0.1);
+
+        assert!(bbox.min.x <= end_x + 0.1);
+        assert!(bbox.min.y <= end_y + 0.1);
+        assert!(bbox.max.x >= end_x - 0.1);
+        assert!(bbox.max.y >= end_y - 0.1);
+    }
+
+    // Test with offset center
+    #[test]
+    fn test_arc_offset_center() {
+        // Test with a non-origin center
+        let center_x = 15.0;
+        let center_y = -10.0;
+        let radius = 5.0;
+        let width = 0.3;
+        let start_angle = 0.0;
+        let sweep_angle = FRAC_PI_2; // 90° sweep
+
+        let arc = create_arc_primitive(center_x, center_y, radius, width, start_angle, sweep_angle);
+        let primitives = vec![arc];
+
+        let bbox = GerberLayer::calculate_bounding_box(&primitives);
+
+        // Verify the bounds for offset center
+        let half_width = width / 2.0;
+
+        // The bounds must include at least the start and end points
+        let start_x = center_x + radius * start_angle.cos();
+        let start_y = center_y + radius * start_angle.sin();
+        let end_x = center_x + radius * (start_angle + sweep_angle).cos();
+        let end_y = center_y + radius * (start_angle + sweep_angle).sin();
+
+        assert!(bbox.min.x <= start_x + 0.1);
+        assert!(bbox.min.y <= start_y + 0.1);
+        assert!(bbox.max.x >= start_x - 0.1);
+        assert!(bbox.max.y >= start_y - 0.1);
+
+        assert!(bbox.min.x <= end_x + 0.1);
+        assert!(bbox.min.y <= end_y + 0.1);
+        assert!(bbox.max.x >= end_x - 0.1);
+        assert!(bbox.max.y >= end_y - 0.1);
+
+        // For a 90° arc in the first quadrant, we expect:
+        assert!(bbox.min.x >= center_x - half_width - 0.1); // min X should be near center
+        assert!(bbox.min.y >= center_y - half_width - 0.1); // min Y should be near center
+        assert!(bbox.max.x <= center_x + radius + half_width + 0.1); // max X should extend to right
+        assert!(bbox.max.y <= center_y + radius + half_width + 0.1); // max Y should extend upward
     }
 }

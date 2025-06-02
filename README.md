@@ -57,29 +57,36 @@ Currently only egui is supported, but the code could be adapted for other render
 Renders many gerbers files, but not all gerber commands and features are supported yet, see below.  The MakerPnP project
 is currently the driving force for upcoming changes.
 
+Current features are likely sufficient for viewing most modern PCB gerber files, the macro support is a key feature.
+
+The list of supported features will be improved as developer time permits, if you'd like to contribute, please see the
+![contributing](#contributing) section below.
+
 ### Supported gerber features
 
-| Supported | Feature                              |
-|----------|--------------------------------------|
-| ✅        | Plot/Move/Flash (D01/D02/D03)        |
-| ✅        | Regions                              |
-| ✅        | Aperture macros (AM)                 |
-| ✅        | Macro variables                      |
-| ✅        | Macro expressions                    |
-| ✅        | Vector Line Primitive                |
-| ✅        | Center Line Primitive                |
-| ✅        | Obround Primitive                    |
-| ✅        | Rectangle Primitive                  |
-| ✅        | Concave and Convex Polygon Primitive |
-| ✅        | Outline Primitive                    |
-| ❌        | Thermal Primitive                    |
-| ✅        | Linear plotting (G01)                |
-| ❌        | Circular plotting (G02/G03)          |
-| ❌        | Exposure (Currently only additive)   |
-| ❌        | Step-repeat blocks (SR)              |
-| ❌        | Block aperture (AB)                  |
-| ❌        | File attributes (TF)                 |
-| ❌        | Aperture attributes (TA)             |
+| Supported | Feature                              | Notes                               |
+|-----------|--------------------------------------|-------------------------------------|
+| ✅         | Plot/Move/Flash (D01/D02/D03)        |                                     |
+| ✅         | Regions                              |                                     |
+| ✅         | Aperture macros (AM)                 |                                     |
+| ✅         | Macro variables                      |                                     |
+| ✅         | Macro expressions                    |                                     |
+| ✅         | Vector Line primitive                |                                     |
+| ✅         | Center Line primitive                |                                     |
+| ✅         | Obround primitive                    |                                     |
+| ✅         | Rectangle primitive                  |                                     |
+| ✅         | Circle primitive                     |                                     |
+| ✅         | Concave and convex polygon primitive |                                     |
+| ✅         | Outline primitive                    |                                     |
+| ❌         | Thermal primitive                    |                                     |
+| ✅         | Linear plotting (G01)                |                                     |
+| ✅         | Circle apertures with holes          |                                     |
+| ✅         | Circular plotting (G02/G03)          | Currently only with circle aperture |
+| ❌         | Exposure                             | Currently only additive             |
+| ❌         | Step-repeat blocks (SR)              |                                     |
+| ❌         | Block aperture (AB)                  |                                     |
+| ❌         | File attributes (TF)                 |                                     |
+| ❌         | Aperture attributes (TA)             |                                     |
 
 ### Other UI/Rendering features
 
@@ -90,11 +97,9 @@ is currently the driving force for upcoming changes.
 | ✅        | X/Y Offset of layer                        |
 | ✅        | Debug modes                                |
 
+### Other rendering limitations
 
-The above list is likely sufficient for viewing most modern PCB gerber files, the macro support is a key feature.
-
-The list of supported features will be improved as developer time permits, if you'd like to contribute, please see the
-![contributing](#contributing) section below.
+* All arcs are limited to 32 points for now.  This is fine for small arcs, but noticable on larger ones.
 
 ## Feedback
 
