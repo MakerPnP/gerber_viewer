@@ -29,6 +29,9 @@ pub use renderer::*;
 #[cfg(feature = "egui")]
 pub use ui::*;
 
+#[cfg(feature = "testing")]
+pub mod testing;
+
 use crate::position::Position;
 
 pub enum Winding {
@@ -51,7 +54,7 @@ pub fn calculate_winding(vertices: &[Position]) -> Winding {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Exposure {
     CutOut,
     Add,

@@ -4,7 +4,7 @@ use std::sync::Arc;
 use egui::Pos2;
 #[cfg(feature = "egui")]
 use egui::epaint::emath::Vec2;
-use gerber_types::Circle;
+use gerber_types::{Circle, InterpolationMode, QuadrantMode};
 use log::{debug, error, info, trace, warn};
 
 use super::expressions::{
@@ -573,6 +573,9 @@ impl GerberLayer {
         let mut layer_primitives = Vec::new();
         let mut current_aperture = None;
         let mut current_pos = Position::ZERO;
+        let mut current_aperture_width = 0.0;
+        let mut interpolation_mode = InterpolationMode::Linear;
+        let mut quadrant_mode = QuadrantMode::Single;
 
         // also record aperture selection errors
         let mut aperture_selection_errors: HashSet<i32> = HashSet::new();
@@ -583,6 +586,12 @@ impl GerberLayer {
 
         for cmd in commands.iter() {
             match cmd {
+                Command::FunctionCode(FunctionCode::GCode(GCode::InterpolationMode(mode))) => {
+                    interpolation_mode = *mode;
+                }
+                Command::FunctionCode(FunctionCode::GCode(GCode::QuadrantMode(mode))) => {
+                    quadrant_mode = *mode;
+                }
                 Command::FunctionCode(FunctionCode::GCode(GCode::RegionMode(enabled))) => {
                     if *enabled {
                         // G36 - Begin Region
@@ -650,8 +659,18 @@ impl GerberLayer {
 
                 Command::FunctionCode(FunctionCode::DCode(DCode::SelectAperture(code))) => {
                     current_aperture = apertures.get(&code);
-                    if current_aperture.is_none() {
-                        aperture_selection_errors.insert(*code);
+
+                    match current_aperture {
+                        Some(ApertureKind::Standard(Aperture::Circle(params))) => {
+                            current_aperture_width = params.diameter;
+                        }
+                        Some(_) => {
+                            // Handle other aperture types...
+                        }
+
+                        None => {
+                            aperture_selection_errors.insert(*code);
+                        }
                     }
                 }
                 Command::FunctionCode(FunctionCode::DCode(DCode::Operation(operation))) => {
@@ -670,27 +689,105 @@ impl GerberLayer {
                             }
                             current_pos = end;
                         }
-                        Operation::Interpolate(coords, ..) => {
+                        Operation::Interpolate(coords, offset) => {
                             let mut end = current_pos;
                             Self::update_position(&mut end, coords);
                             if in_region {
                                 // Add vertex to current region
                                 current_region_vertices.push(end);
                             } else if let Some(aperture) = current_aperture {
-                                match aperture {
-                                    ApertureKind::Standard(Aperture::Circle(gerber_types::Circle {
-                                        diameter,
-                                        ..
-                                    })) => {
-                                        layer_primitives.push(GerberPrimitive::Line {
-                                            start: current_pos,
-                                            end,
-                                            width: *diameter,
-                                            exposure: Exposure::Add,
-                                        });
-                                    }
-                                    _ => {
-                                        // TODO support more Apertures (rectangle, obround, etc)
+                                match interpolation_mode {
+                                    InterpolationMode::Linear => match aperture {
+                                        ApertureKind::Standard(Aperture::Circle(Circle {
+                                            diameter, ..
+                                        })) => {
+                                            layer_primitives.push(GerberPrimitive::Line {
+                                                start: current_pos,
+                                                end,
+                                                width: *diameter,
+                                                exposure: Exposure::Add,
+                                            });
+                                        }
+                                        _ => {
+                                            warn!(
+                                                "Unsupported aperture for linear interpolation. aperture: {:?}",
+                                                aperture
+                                            );
+                                        }
+                                    },
+                                    InterpolationMode::ClockwiseCircular
+                                    | InterpolationMode::CounterclockwiseCircular => {
+                                        // Handle circular interpolation
+                                        if let Some(offset) = offset {
+                                            // Get I and J offsets (relative to current position)
+                                            let offset_i = offset
+                                                .x
+                                                .map(|x| x.into())
+                                                .unwrap_or(0.0);
+                                            let offset_j = offset
+                                                .y
+                                                .map(|y| y.into())
+                                                .unwrap_or(0.0);
+
+                                            // Calculate center of the arc
+                                            let center_x = current_pos.x + offset_i;
+                                            let center_y = current_pos.y + offset_j;
+                                            let center = Position {
+                                                x: center_x,
+                                                y: center_y,
+                                            };
+
+                                            // Calculate radius (distance from current position to center)
+                                            let radius = ((offset_i * offset_i) + (offset_j * offset_j)).sqrt();
+
+                                            // Calculate start angle (from center to current position)
+                                            let start_angle =
+                                                (current_pos.y - center.y).atan2(current_pos.x - center.x);
+
+                                            // Calculate end angle (from center to target position)
+                                            let end_angle = (end.y - center.y).atan2(end.x - center.x);
+
+                                            // Calculate sweep angle based on interpolation mode
+                                            let mut sweep_angle = match interpolation_mode {
+                                                InterpolationMode::ClockwiseCircular => {
+                                                    if end_angle > start_angle {
+                                                        end_angle - start_angle - 2.0 * std::f64::consts::PI
+                                                    } else {
+                                                        end_angle - start_angle
+                                                    }
+                                                }
+                                                InterpolationMode::CounterclockwiseCircular => {
+                                                    if end_angle < start_angle {
+                                                        end_angle - start_angle + 2.0 * std::f64::consts::PI
+                                                    } else {
+                                                        end_angle - start_angle
+                                                    }
+                                                }
+                                                _ => 0.0, // Should never happen
+                                            };
+
+                                            // Adjust for single/multi quadrant mode
+                                            if let QuadrantMode::Single = quadrant_mode {
+                                                // In single quadrant mode, sweep angle is always <= 90°
+                                                if sweep_angle.abs() > std::f64::consts::PI / 2.0 {
+                                                    if sweep_angle > 0.0 {
+                                                        sweep_angle = std::f64::consts::PI / 2.0;
+                                                    } else {
+                                                        sweep_angle = -std::f64::consts::PI / 2.0;
+                                                    }
+                                                }
+                                            }
+
+                                            // Create arc primitive
+                                            layer_primitives.push(GerberPrimitive::Arc {
+                                                center,
+                                                radius,
+                                                width: current_aperture_width,
+                                                start_angle,
+                                                sweep_angle,
+                                                exposure: Exposure::Add,
+                                            });
+                                        }
                                     }
                                 }
                             }
@@ -748,11 +845,20 @@ impl GerberLayer {
                                                     diameter,
                                                     hole_diameter,
                                                 }) => {
-                                                    let primitive = if let Some(hole_dia) = hole_diameter {
+                                                    let primitive = if let Some(hole_diameter) = hole_diameter {
+                                                        let outer_radius = diameter / 2.0;
+                                                        let inner_radius = hole_diameter / 2.0;
+
+                                                        // Mid radius should be the center of where we want our stroke
+                                                        let mid_radius = (outer_radius + inner_radius) / 2.0;
+
+                                                        // For StrokeKind::Middle, width should be exactly (outer_radius - inner_radius)
+                                                        let width = outer_radius - inner_radius;
+
                                                         GerberPrimitive::Arc {
                                                             center: current_pos,
-                                                            radius: (*diameter - *hole_dia) / 2.0,
-                                                            width: *hole_dia,
+                                                            radius: mid_radius,
+                                                            width,
                                                             start_angle: 0.0,
                                                             sweep_angle: 2.0 * std::f64::consts::PI, // Full circle, clockwise
                                                             exposure: Exposure::Add,
@@ -1018,5 +1124,432 @@ impl ViewState {
     pub fn gerber_to_screen_coords(&self, gerber_pos: Position) -> Pos2 {
         let gerber_pos = gerber_pos.invert_y();
         ((gerber_pos * self.scale as f64) + self.translation).to_pos2()
+    }
+}
+
+#[cfg(test)]
+mod circular_plotting_tests {
+    use std::convert::TryFrom;
+    use std::f64::consts::PI;
+
+    use gerber_types::{
+        Command, CoordinateFormat, CoordinateNumber, CoordinateOffset, Coordinates, DCode, FunctionCode, GCode,
+        InterpolationMode, Operation, QuadrantMode, Unit,
+    };
+
+    use super::*;
+    use crate::Exposure;
+    use crate::layer::{GerberLayer, GerberPrimitive};
+    use crate::testing::dump_gerber_source;
+
+    #[test]
+    fn test_rounded_rectangle_outline() {
+        // Given
+        env_logger::init();
+
+        // and
+        let width: f64 = 5.0; // mm
+        let height: f64 = 10.0; // mm
+        let corner_radius: f64 = 1.0; // mm
+        let line_width: f64 = 0.1; // mm
+
+        let format = CoordinateFormat::new(2, 4);
+
+        let left = 0.0;
+        let right = width;
+        let bottom = 0.0;
+        let top = height;
+
+        let mut commands: Vec<Command> = Vec::new();
+
+        // Set unit to millimeters
+        commands.push(Command::ExtendedCode(ExtendedCode::Unit(Unit::Millimeters)));
+
+        // Define circle aperture for outline
+        commands.push(Command::ExtendedCode(ExtendedCode::ApertureDefinition(
+            ApertureDefinition::new(10, Aperture::Circle(Circle::new(line_width))),
+        )));
+
+        // Select the defined aperture
+        commands.push(Command::FunctionCode(FunctionCode::DCode(DCode::SelectAperture(10))));
+
+        // Select the aperture
+        commands.push(Command::FunctionCode(FunctionCode::DCode(DCode::SelectAperture(10))));
+
+        commands.push(GCode::InterpolationMode(InterpolationMode::Linear).into());
+        commands.push(GCode::QuadrantMode(QuadrantMode::Multi).into());
+
+        // Start at bottom-left corner + radius in x direction
+        commands.push(
+            DCode::Operation(Operation::Move(Coordinates::new(
+                CoordinateNumber::try_from(left + corner_radius).unwrap(),
+                CoordinateNumber::try_from(bottom).unwrap(),
+                format,
+            )))
+            .into(),
+        );
+
+        // Draw bottom line
+        commands.push(
+            DCode::Operation(Operation::Interpolate(
+                Coordinates::new(
+                    CoordinateNumber::try_from(right - corner_radius).unwrap(),
+                    CoordinateNumber::try_from(bottom).unwrap(),
+                    format,
+                ),
+                None,
+            ))
+            .into(),
+        );
+
+        // Draw bottom-right corner (90 degree arc, clockwise)
+        commands.push(GCode::InterpolationMode(InterpolationMode::ClockwiseCircular).into());
+        commands.push(
+            DCode::Operation(Operation::Interpolate(
+                Coordinates::new(
+                    CoordinateNumber::try_from(right).unwrap(),
+                    CoordinateNumber::try_from(bottom + corner_radius).unwrap(),
+                    format,
+                ),
+                Some(CoordinateOffset::new(
+                    CoordinateNumber::try_from(corner_radius).unwrap(),
+                    CoordinateNumber::try_from(0.0).unwrap(),
+                    format,
+                )),
+            ))
+            .into(),
+        );
+
+        // Switch back to linear interpolation
+        commands.push(GCode::InterpolationMode(InterpolationMode::Linear).into());
+
+        // Draw right line
+        commands.push(
+            DCode::Operation(Operation::Interpolate(
+                Coordinates::new(
+                    CoordinateNumber::try_from(right).unwrap(),
+                    CoordinateNumber::try_from(top - corner_radius).unwrap(),
+                    format,
+                ),
+                None,
+            ))
+            .into(),
+        );
+
+        // Draw top-right corner (90 degree arc, clockwise)
+        commands.push(GCode::InterpolationMode(InterpolationMode::ClockwiseCircular).into());
+        commands.push(
+            DCode::Operation(Operation::Interpolate(
+                Coordinates::new(
+                    CoordinateNumber::try_from(right - corner_radius).unwrap(),
+                    CoordinateNumber::try_from(top).unwrap(),
+                    format,
+                ),
+                Some(CoordinateOffset::new(
+                    CoordinateNumber::try_from(0.0).unwrap(),
+                    CoordinateNumber::try_from(corner_radius).unwrap(),
+                    format,
+                )),
+            ))
+            .into(),
+        );
+
+        // Switch back to linear interpolation
+        commands.push(GCode::InterpolationMode(InterpolationMode::Linear).into());
+
+        // Draw top line
+        commands.push(
+            DCode::Operation(Operation::Interpolate(
+                Coordinates::new(
+                    CoordinateNumber::try_from(left + corner_radius).unwrap(),
+                    CoordinateNumber::try_from(top).unwrap(),
+                    format,
+                ),
+                None,
+            ))
+            .into(),
+        );
+
+        // Draw top-left corner (90 degree arc, clockwise)
+        commands.push(GCode::InterpolationMode(InterpolationMode::ClockwiseCircular).into());
+        commands.push(
+            DCode::Operation(Operation::Interpolate(
+                Coordinates::new(
+                    CoordinateNumber::try_from(left).unwrap(),
+                    CoordinateNumber::try_from(top - corner_radius).unwrap(),
+                    format,
+                ),
+                Some(CoordinateOffset::new(
+                    CoordinateNumber::try_from(-corner_radius).unwrap(),
+                    CoordinateNumber::try_from(0.0).unwrap(),
+                    format,
+                )),
+            ))
+            .into(),
+        );
+
+        // Switch back to linear interpolation
+        commands.push(GCode::InterpolationMode(InterpolationMode::Linear).into());
+
+        // Draw left line
+        commands.push(
+            DCode::Operation(Operation::Interpolate(
+                Coordinates::new(
+                    CoordinateNumber::try_from(left).unwrap(),
+                    CoordinateNumber::try_from(bottom + corner_radius).unwrap(),
+                    format,
+                ),
+                None,
+            ))
+            .into(),
+        );
+
+        // Draw bottom-left corner (90 degree arc, clockwise) to complete the outline
+        commands.push(GCode::InterpolationMode(InterpolationMode::ClockwiseCircular).into());
+        commands.push(
+            DCode::Operation(Operation::Interpolate(
+                Coordinates::new(
+                    CoordinateNumber::try_from(left + corner_radius).unwrap(),
+                    CoordinateNumber::try_from(bottom).unwrap(),
+                    format,
+                ),
+                Some(CoordinateOffset::new(
+                    CoordinateNumber::try_from(0.0).unwrap(),
+                    CoordinateNumber::try_from(-corner_radius).unwrap(),
+                    format,
+                )),
+            ))
+            .into(),
+        );
+
+        // and
+        dump_gerber_source(&commands);
+
+        // When
+        let gerber_layer = GerberLayer::new(commands);
+        let primitives = gerber_layer.primitives();
+
+        // Then
+        println!("primitives: {:?}", primitives);
+
+        // Verify primitives count - should have 4 lines and 4 arcs
+        assert_eq!(primitives.len(), 8);
+
+        // Verify the bottom-right arc (index 1)
+        if let GerberPrimitive::Arc {
+            center,
+            radius,
+            width,
+            start_angle,
+            sweep_angle,
+            exposure,
+        } = &primitives[1]
+        {
+            // Expected center coordinates
+            assert_eq!(center.x, 5.0);
+            assert_eq!(center.y, 0.0);
+
+            // Radius should match corner_radius
+            assert_eq!(*radius, corner_radius);
+
+            // Line width should match the aperture's line_width
+            assert_eq!(*width, line_width);
+
+            // For this specific primitive, we expect start_angle = PI and sweep_angle = -PI/2
+            assert!((start_angle - PI).abs() < 1e-6);
+            assert!((sweep_angle - (-PI / 2.0)).abs() < 1e-6);
+
+            // Default exposure should be Add
+            assert!(matches!(*exposure, Exposure::Add));
+        } else {
+            panic!("Expected Arc primitive at index 1");
+        }
+
+        // Verify the top-right arc (index 3)
+        if let GerberPrimitive::Arc {
+            center,
+            radius,
+            width,
+            start_angle,
+            sweep_angle,
+            exposure,
+        } = &primitives[3]
+        {
+            // Expected center coordinates
+            assert_eq!(center.x, 5.0);
+            assert_eq!(center.y, 10.0);
+
+            // Radius should match corner_radius
+            assert_eq!(*radius, corner_radius);
+
+            // Line width should match the aperture's line_width
+            assert_eq!(*width, line_width);
+
+            // For this specific primitive, we expect start_angle ≈ -PI/2 and sweep_angle = -PI/2
+            assert!((start_angle - (-PI / 2.0)).abs() < 1e-6);
+            assert!((sweep_angle - (-PI / 2.0)).abs() < 1e-6);
+
+            // Default exposure should be Add
+            assert!(matches!(*exposure, Exposure::Add));
+        } else {
+            panic!("Expected Arc primitive at index 3");
+        }
+
+        // Verify the top-left arc (index 5)
+        if let GerberPrimitive::Arc {
+            center,
+            radius,
+            width,
+            start_angle,
+            sweep_angle,
+            exposure,
+        } = &primitives[5]
+        {
+            // Expected center coordinates
+            assert_eq!(center.x, 0.0);
+            assert_eq!(center.y, 10.0);
+
+            // Radius should match corner_radius
+            assert_eq!(*radius, corner_radius);
+
+            // Line width should match the aperture's line_width
+            assert_eq!(*width, line_width);
+
+            // For this specific primitive, we expect start_angle = 0 and sweep_angle = -PI/2
+            assert!((start_angle - 0.0).abs() < 1e-6);
+            assert!((sweep_angle - (-PI / 2.0)).abs() < 1e-6);
+
+            // Default exposure should be Add
+            assert!(matches!(*exposure, Exposure::Add));
+        } else {
+            panic!("Expected Arc primitive at index 5");
+        }
+
+        // Verify the bottom-left arc (index 7)
+        if let GerberPrimitive::Arc {
+            center,
+            radius,
+            width,
+            start_angle,
+            sweep_angle,
+            exposure,
+        } = &primitives[7]
+        {
+            // Expected center coordinates
+            assert_eq!(center.x, 0.0);
+            assert_eq!(center.y, 0.0);
+
+            // Radius should match corner_radius
+            assert_eq!(*radius, corner_radius);
+
+            // Line width should match the aperture's line_width
+            assert_eq!(*width, line_width);
+
+            // For this specific primitive, we expect start_angle = 3*PI/2 (or PI*1.5) and sweep_angle = -PI/2
+            assert!((start_angle - (PI / 2.0)).abs() < 1e-6);
+            assert!((sweep_angle - (-PI / 2.0)).abs() < 1e-6);
+
+            // Default exposure should be Add
+            assert!(matches!(*exposure, Exposure::Add));
+        } else {
+            panic!("Expected Arc primitive at index 7");
+        }
+    }
+}
+
+#[cfg(test)]
+mod circle_aperture_tests {
+    use std::f64::consts::PI;
+
+    use gerber_types::{
+        Aperture, ApertureDefinition, Circle, Command, CoordinateFormat, CoordinateNumber, Coordinates, DCode,
+        ExtendedCode, FunctionCode, Operation, Unit,
+    };
+
+    use crate::Exposure;
+    use crate::position::Position;
+    use crate::testing::dump_gerber_source;
+    use crate::{GerberLayer, GerberPrimitive};
+
+    #[test]
+    fn test_circle_with_hole_rendering() {
+        // Given: A circle aperture with a hole
+        let outer_diameter = 2.5;
+        let hole_diameter = 0.5;
+        let center = Position::new(0.0, 0.0);
+
+        // Create an aperture definition that would be parsed from the Gerber file
+        let aperture = Aperture::Circle(Circle {
+            diameter: outer_diameter,
+            hole_diameter: Some(hole_diameter),
+        });
+
+        let format = CoordinateFormat::new(2, 4);
+
+        // Create commands that would define and use this aperture
+        let commands = vec![
+            // Set unit to millimeters
+            Command::ExtendedCode(ExtendedCode::Unit(Unit::Millimeters)),
+            Command::ExtendedCode(ExtendedCode::ApertureDefinition(ApertureDefinition::new(11, aperture))),
+            Command::FunctionCode(FunctionCode::DCode(DCode::SelectAperture(11))),
+            Command::FunctionCode(FunctionCode::DCode(DCode::Operation(Operation::Flash(
+                Coordinates::new(
+                    CoordinateNumber::try_from(center.x).unwrap(),
+                    CoordinateNumber::try_from(center.y).unwrap(),
+                    format,
+                ),
+            )))),
+        ];
+
+        // and
+        dump_gerber_source(&commands);
+
+        // When
+        let layer = GerberLayer::new(commands);
+        let primitives = layer.primitives();
+
+        // Then
+        assert_eq!(primitives.len(), 1);
+
+        match &primitives[0] {
+            GerberPrimitive::Arc {
+                center: c,
+                radius,
+                width,
+                start_angle,
+                sweep_angle,
+                exposure,
+            } => {
+                assert_eq!(*c, center);
+
+                // For correct rendering with StrokeKind::Middle
+                // The radius should be midway between outer and inner radius
+                let expected_radius = (outer_diameter / 2.0 + hole_diameter / 2.0) / 2.0;
+
+                assert!(
+                    (radius - expected_radius).abs() < f64::EPSILON,
+                    "Radius should be midway between outer and inner radii ({}), got {}",
+                    expected_radius,
+                    radius
+                );
+
+                // Width should be the difference between outer and inner radius
+                let expected_width = outer_diameter / 2.0 - hole_diameter / 2.0;
+                assert!(
+                    (width - expected_width).abs() < f64::EPSILON,
+                    "Width should equal the difference between outer and inner radii ({}), got {}",
+                    expected_width,
+                    width
+                );
+
+                assert_eq!(*start_angle, 0.0);
+                assert!(
+                    (sweep_angle.abs() - 2.0 * PI).abs() < f64::EPSILON,
+                    "Sweep angle should be 2π radians (full circle)"
+                );
+                assert_eq!(*exposure, Exposure::Add);
+            }
+            _ => panic!("Expected an Arc primitive for circle with hole"),
+        }
     }
 }

@@ -205,7 +205,7 @@ impl GerberRenderer {
                         stroke: PathStroke {
                             width: *width as f32 * view.scale,
                             color: ColorMode::Solid(color),
-                            kind: StrokeKind::Inside,
+                            kind: StrokeKind::Middle,
                         },
                     }));
                 }
