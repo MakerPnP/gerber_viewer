@@ -1328,131 +1328,140 @@ mod circular_plotting_tests {
         // When
         let gerber_layer = GerberLayer::new(commands);
         let primitives = gerber_layer.primitives();
-
-        // Then
         println!("primitives: {:?}", primitives);
 
+        // Then
         // Verify primitives count - should have 4 lines and 4 arcs
         assert_eq!(primitives.len(), 8);
 
-        // Verify the bottom-right arc (index 1)
-        if let GerberPrimitive::Arc {
-            center,
-            radius,
-            width,
-            start_angle,
-            sweep_angle,
-            exposure,
-        } = &primitives[1]
-        {
-            // Expected center coordinates
-            assert_eq!(center.x, 5.0);
-            assert_eq!(center.y, 0.0);
-
-            // Radius should match corner_radius
-            assert_eq!(*radius, corner_radius);
-
-            // Line width should match the aperture's line_width
-            assert_eq!(*width, line_width);
-
-            // For this specific primitive, we expect start_angle = PI and sweep_angle = -PI/2
-            assert!((start_angle - PI).abs() < 1e-6);
-            assert!((sweep_angle - (-PI / 2.0)).abs() < 1e-6);
-
-            // Default exposure should be Add
-            assert!(matches!(*exposure, Exposure::Add));
-        } else {
-            panic!("Expected Arc primitive at index 1");
+        // Verify that we have alternating lines and arcs
+        for i in 0..8 {
+            match i % 2 {
+                0 => assert!(
+                    matches!(primitives[i], GerberPrimitive::Line { .. }),
+                    "Expected Line at index {}",
+                    i
+                ),
+                1 => assert!(
+                    matches!(primitives[i], GerberPrimitive::Arc { .. }),
+                    "Expected Arc at index {}",
+                    i
+                ),
+                _ => unreachable!(),
+            }
         }
 
-        // Verify the top-right arc (index 3)
-        if let GerberPrimitive::Arc {
-            center,
-            radius,
-            width,
-            start_angle,
-            sweep_angle,
-            exposure,
-        } = &primitives[3]
-        {
-            // Expected center coordinates
-            assert_eq!(center.x, 5.0);
-            assert_eq!(center.y, 10.0);
+        // Define the expected positions for centers and radii first
+        let expected_centers = [
+            (5.0, 0.0),  // bottom-right corner
+            (5.0, 10.0), // top-right corner
+            (0.0, 10.0), // top-left corner
+            (0.0, 0.0),  // bottom-left corner
+        ];
 
-            // Radius should match corner_radius
-            assert_eq!(*radius, corner_radius);
+        // Collect all arcs for property testing
+        let arcs: Vec<_> = primitives
+            .iter()
+            .cloned()
+            .enumerate()
+            .filter_map(|(i, p)| {
+                if let GerberPrimitive::Arc {
+                    center,
+                    radius,
+                    width,
+                    start_angle,
+                    sweep_angle,
+                    exposure,
+                } = p
+                {
+                    Some((i, center, radius, width, start_angle, sweep_angle, exposure))
+                } else {
+                    None
+                }
+            })
+            .collect();
 
-            // Line width should match the aperture's line_width
-            assert_eq!(*width, line_width);
+        // Verify we have exactly 4 arcs
+        assert_eq!(arcs.len(), 4, "Expected exactly 4 arcs");
 
-            // For this specific primitive, we expect start_angle ≈ -PI/2 and sweep_angle = -PI/2
-            assert!((start_angle - (-PI / 2.0)).abs() < 1e-6);
-            assert!((sweep_angle - (-PI / 2.0)).abs() < 1e-6);
-
-            // Default exposure should be Add
-            assert!(matches!(*exposure, Exposure::Add));
-        } else {
-            panic!("Expected Arc primitive at index 3");
+        // Property 1: All sweep angles should be -PI/2
+        for (i, _, _, _, _, sweep_angle, _) in &arcs {
+            assert!(
+                (sweep_angle + PI / 2.0).abs() < 1e-6,
+                "Arc at index {} has sweep angle {} which is not -PI/2",
+                i,
+                sweep_angle
+            );
         }
 
-        // Verify the top-left arc (index 5)
-        if let GerberPrimitive::Arc {
-            center,
-            radius,
-            width,
-            start_angle,
-            sweep_angle,
-            exposure,
-        } = &primitives[5]
-        {
-            // Expected center coordinates
-            assert_eq!(center.x, 0.0);
-            assert_eq!(center.y, 10.0);
-
-            // Radius should match corner_radius
-            assert_eq!(*radius, corner_radius);
-
-            // Line width should match the aperture's line_width
-            assert_eq!(*width, line_width);
-
-            // For this specific primitive, we expect start_angle = 0 and sweep_angle = -PI/2
-            assert!((start_angle - 0.0).abs() < 1e-6);
-            assert!((sweep_angle - (-PI / 2.0)).abs() < 1e-6);
-
-            // Default exposure should be Add
-            assert!(matches!(*exposure, Exposure::Add));
-        } else {
-            panic!("Expected Arc primitive at index 5");
+        // Property 2: All radii should be equal to corner_radius
+        for (i, _, radius, _, _, _, _) in &arcs {
+            assert_eq!(
+                *radius, corner_radius,
+                "Arc at index {} has radius {} which is not equal to corner_radius {}",
+                i, radius, corner_radius
+            );
         }
 
-        // Verify the bottom-left arc (index 7)
-        if let GerberPrimitive::Arc {
-            center,
-            radius,
-            width,
-            start_angle,
-            sweep_angle,
-            exposure,
-        } = &primitives[7]
-        {
-            // Expected center coordinates
-            assert_eq!(center.x, 0.0);
-            assert_eq!(center.y, 0.0);
+        // Property 3: All line widths should be equal to line_width
+        for (i, _, _, width, _, _, _) in &arcs {
+            assert_eq!(
+                *width, line_width,
+                "Arc at index {} has width {} which is not equal to line_width {}",
+                i, width, line_width
+            );
+        }
 
-            // Radius should match corner_radius
-            assert_eq!(*radius, corner_radius);
+        // Property 4: All arcs should have Add exposure
+        for (i, _, _, _, _, _, exposure) in &arcs {
+            assert!(
+                matches!(*exposure, Exposure::Add),
+                "Arc at index {} has exposure {:?} which is not Add",
+                i,
+                exposure
+            );
+        }
 
-            // Line width should match the aperture's line_width
-            assert_eq!(*width, line_width);
+        // Property 5: Centers should match expected positions
+        for (i, center, _, _, _, _, _) in &arcs {
+            let expected_center = expected_centers[(*i - 1) / 2];
+            assert_eq!(
+                center.x, expected_center.0,
+                "Arc at index {} has center x {} which is not equal to expected {}",
+                i, center.x, expected_center.0
+            );
+            assert_eq!(
+                center.y, expected_center.1,
+                "Arc at index {} has center y {} which is not equal to expected {}",
+                i, center.y, expected_center.1
+            );
+        }
 
-            // For this specific primitive, we expect start_angle = 3*PI/2 (or PI*1.5) and sweep_angle = -PI/2
-            assert!((start_angle - (PI / 2.0)).abs() < 1e-6);
-            assert!((sweep_angle - (-PI / 2.0)).abs() < 1e-6);
+        // Display start angles for each arc to document the pattern
+        println!("Arc start angles (in radians):");
+        for (i, _, _, _, start_angle, _, _) in &arcs {
+            println!("Arc {}: start_angle = {}", i, start_angle);
+        }
 
-            // Default exposure should be Add
-            assert!(matches!(*exposure, Exposure::Add));
-        } else {
-            panic!("Expected Arc primitive at index 7");
+        // Optionally, verify the specific pattern of start angles that was observed
+        // This is kept separate as it's more of a documentation of the observed pattern
+        // rather than an enforced property of the API
+        let arc_indices = [1, 3, 5, 7]; // indices of arcs in the primitives list
+        let expected_start_angles = [PI, -PI / 2.0, 0.0, PI / 2.0];
+
+        for (idx, arc_idx) in arc_indices.iter().enumerate() {
+            if let GerberPrimitive::Arc {
+                start_angle, ..
+            } = &primitives[*arc_idx]
+            {
+                assert!(
+                    (start_angle - expected_start_angles[idx]).abs() < 1e-6,
+                    "Arc at index {} has start_angle {} which doesn't match expected pattern {}",
+                    arc_idx,
+                    start_angle,
+                    expected_start_angles[idx]
+                );
+            }
         }
     }
 }
