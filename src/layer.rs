@@ -1130,7 +1130,7 @@ impl ViewState {
 #[cfg(test)]
 mod circular_plotting_tests {
     use std::convert::TryFrom;
-    use std::f64::consts::PI;
+    use std::f64::consts::{FRAC_PI_2, PI};
 
     use gerber_types::{
         Command, CoordinateFormat, CoordinateNumber, CoordinateOffset, Coordinates, DCode, FunctionCode, GCode,
@@ -1387,10 +1387,11 @@ mod circular_plotting_tests {
         // Property 1: All sweep angles should be -PI/2
         for (i, _, _, _, _, sweep_angle, _) in &arcs {
             assert!(
-                (sweep_angle + PI / 2.0).abs() < 1e-6,
-                "Arc at index {} has sweep angle {} which is not -PI/2",
+                (sweep_angle + FRAC_PI_2).abs() < f64::EPSILON,
+                "Arc at index {} has sweep angle {} which is not -PI/2 (expected {})",
                 i,
-                sweep_angle
+                sweep_angle,
+                -FRAC_PI_2
             );
         }
 
@@ -1440,25 +1441,33 @@ mod circular_plotting_tests {
         // Display start angles for each arc to document the pattern
         println!("Arc start angles (in radians):");
         for (i, _, _, _, start_angle, _, _) in &arcs {
-            println!("Arc {}: start_angle = {}", i, start_angle);
+            // Convert to degrees for more readable output
+            let degrees = start_angle.to_degrees();
+            println!("Arc {}: start_angle = {} rad ({}°)", i, start_angle, degrees);
         }
 
         // Optionally, verify the specific pattern of start angles that was observed
         // This is kept separate as it's more of a documentation of the observed pattern
         // rather than an enforced property of the API
         let arc_indices = [1, 3, 5, 7]; // indices of arcs in the primitives list
-        let expected_start_angles = [PI, -PI / 2.0, 0.0, PI / 2.0];
+        let expected_start_angles = [PI, -FRAC_PI_2, 0.0, FRAC_PI_2];
+        let angle_names = ["PI", "-PI/2", "0", "PI/2"]; // For better error messages
 
-        for (idx, arc_idx) in arc_indices.iter().enumerate() {
+        for (idx, (arc_idx, angle_name)) in arc_indices
+            .iter()
+            .zip(angle_names.iter())
+            .enumerate()
+        {
             if let GerberPrimitive::Arc {
                 start_angle, ..
             } = &primitives[*arc_idx]
             {
                 assert!(
-                    (start_angle - expected_start_angles[idx]).abs() < 1e-6,
-                    "Arc at index {} has start_angle {} which doesn't match expected pattern {}",
+                    (start_angle - expected_start_angles[idx]).abs() < f64::EPSILON,
+                    "Arc at index {} has start_angle {} which doesn't match expected {} ({})",
                     arc_idx,
                     start_angle,
+                    angle_name,
                     expected_start_angles[idx]
                 );
             }
