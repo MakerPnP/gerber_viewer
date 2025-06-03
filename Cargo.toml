@@ -26,6 +26,9 @@ thiserror = "2.0.12"
 # Logging
 log = "0.4"
 
+# Profiling
+profiling = { version = "1.0.16" }
+
 [features]
 default = ["types", "parser", "egui"]
 
