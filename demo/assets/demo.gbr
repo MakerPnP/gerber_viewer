@@ -8,8 +8,6 @@ G04 Gerber Fmt 4.6, Leading zero omitted, Abs format (unit mm)*
 %MOMM*%
 %LPD*%
 G01*
-G04 APERTURE LIST*
-G04 Aperture macros list*
 %AMRoundRect*
 0 Rectangle with rounded corners*
 0 $1 Rounding radius*

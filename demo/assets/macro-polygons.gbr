@@ -8,8 +8,6 @@ G04 Gerber Fmt 4.6, Leading zero omitted, Abs format (unit mm)*
 %MOMM*%
 %LPD*%
 G01*
-G04 APERTURE LIST*
-G04 Aperture macros list*
 %AMPolygon*
 0 $1 Vertices (3 minimum)*
 0 $2 Diameter*
