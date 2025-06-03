@@ -119,6 +119,13 @@ impl BoundingBox {
             .map(|v| transform.apply_to_position(v))
             .collect::<Vec<_>>()
     }
+
+    pub fn expand(&mut self, other: &BoundingBox) {
+        self.min.x = self.min.x.min(other.min.x);
+        self.min.y = self.min.y.min(other.min.y);
+        self.max.x = self.max.x.max(other.max.x);
+        self.max.y = self.max.y.max(other.max.y);
+    }
 }
 
 impl Default for BoundingBox {
