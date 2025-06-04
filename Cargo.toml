@@ -12,11 +12,11 @@ egui = { version = "0.31.1", optional = true }
 # currently un-released, using latest gerber_types with updates to support macro expressions
 #gerber_types = "0.4.0"
 gerber_types = { git = "https://github.com/MakerPnP/gerber-types.git", rev = "7641a4c92482411b6a05a5dc36793151763b40e6"}
-#gerber_types = { path = "../../../libraries/rust/gerber-types", optional = true }
+#gerber_types = { path = "../gerber-types" }
 
 # Gerber parser (optional, see README.md)
 gerber_parser = { git = "https://github.com/makerpnp/gerber-parser.git", rev = "c8a86362b7cf68964dedce3fb7339d7a5feb9106", optional = true }
-#gerber_parser = { path = "../../../libraries/rust/gerber-parser", optional = true }
+#gerber_parser = { path = "../gerber-parser", optional = true }
 
 # Math
 rand = "0.9.1"
