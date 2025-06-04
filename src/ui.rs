@@ -21,7 +21,7 @@ impl UiState {
         self.handle_zooming(view_state, &response, ui);
 
         self.center_screen_pos = viewport.center();
-        self.origin_screen_pos = view_state.gerber_to_screen_coords(Position::ZERO);
+        self.origin_screen_pos = view_state.gerber_to_screen_coords(Position::new(0.0, 0.0));
 
         trace!(
             "update. view_state: {:?}, viewport: {:?}, cursor_gerber_coords: {:?}",

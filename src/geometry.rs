@@ -1,6 +1,5 @@
 use egui::{Pos2, Vec2, Vec2b};
 use log::debug;
-
 use crate::spacial::Vector;
 use crate::Position;
 
@@ -131,8 +130,8 @@ impl BoundingBox {
 impl Default for BoundingBox {
     fn default() -> Self {
         Self {
-            min: Position::MAX,
-            max: Position::MIN,
+            min: Position::new(f64::MAX, f64::MAX),
+            max: Position::new(f64::MIN, f64::MIN),
         }
     }
 }
@@ -174,16 +173,13 @@ impl BoundingBox {
     pub fn apply_mirroring(&self, mirror_x: bool, mirror_y: bool, offset: Vector) -> Self {
         let mut vertices = self.vertices();
 
-        for Position {
-            x,
-            y,
-        } in &mut vertices
+        for position  in &mut vertices
         {
             if mirror_x {
-                *x = offset.x - (*x - offset.x);
+                position.x = offset.x - (position.x - offset.x);
             }
             if mirror_y {
-                *y = offset.y - (*y - offset.y);
+                position.y = offset.y - (position.y - offset.y);
             }
         }
 
@@ -211,7 +207,7 @@ impl BoundingBox {
 
     /// Returns the geometric center of the bounding box as a Position
     pub fn center(&self) -> Position {
-        (self.min + self.max) / 2.0
+        Position::new(self.min.x + self.max.x, self.min.y + self.max.y) / 2.0 
     }
 
     /// Returns 4 corner points of the bounding box such that the result is useable as a closed path.
@@ -231,18 +227,15 @@ impl BoundingBox {
 
     /// Constructs a bounding box from a list of points
     pub fn from_points(points: &[Position]) -> Self {
-        let mut min = Position::MAX;
-        let mut max = Position::MIN;
+        let mut min = Position::new(f64::MAX, f64::MAX);
+        let mut max = Position::new(f64::MIN, f64::MIN);
 
-        for &Position {
-            x,
-            y,
-        } in points
+        for position in points
         {
-            min.x = min.x.min(x);
-            min.y = min.y.min(y);
-            max.x = max.x.max(x);
-            max.y = max.y.max(y);
+            min.x = min.x.min(position.x);
+            min.y = min.y.min(position.y);
+            max.x = max.x.max(position.x);
+            max.y = max.y.max(position.y);
         }
 
         Self {
@@ -275,7 +268,7 @@ mod bbox_tests {
             max: Position::new(3.0, 4.0),
         };
 
-        let rotated = bbox.apply_rotation(std::f64::consts::FRAC_PI_2, Vector::ZERO); // 90 degrees
+        let rotated = bbox.apply_rotation(std::f64::consts::FRAC_PI_2, Vector::new(0.0, 0.0)); // 90 degrees
 
         // Expected:
         // Points rotate CCW around origin:
@@ -304,14 +297,8 @@ mod bbox_tests {
     fn test_geometric_center(#[case] origin: (f64, f64), #[case] size: (f64, f64), #[case] expected: (f64, f64)) {
         // Create bounding box from origin and size
         let bbox = BoundingBox {
-            min: Position {
-                x: origin.0,
-                y: origin.1,
-            },
-            max: Position {
-                x: origin.0 + size.0,
-                y: origin.1 + size.1,
-            },
+            min: Position::new(origin.0, origin.1),
+            max: Position::new(origin.0 + size.0, origin.1 + size.1),
         };
 
         let center = bbox.center();
