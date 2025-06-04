@@ -1,6 +1,12 @@
 # Gerber viewer
 
-A cargo crate for rendering Gerber Viewers.
+[![Build status][build-status-badge]][build-status]
+[![Crates.io][crates-io-badge]][crates-io]
+[![MakerPnP Discord][discord-badge]][discord]
+
+- [Docs (released)](https://docs.rs/gerber-viewer/)
+
+A cargo crate for rendering Gerber files.
 
 Uses `gerber-types` for specification of the gerber commands.
 
@@ -111,6 +117,28 @@ you're able to create a gerber file with just the elements that have issues that
 Use the github issue tracker and pull-requests.  If you're embarking on a large change it's usually a good idea to
 open an issue first to state your intention, for bug fixes and small changes just open a PR.
 
+## Related crates
+
+### Gerber Types
+
+A rust crate for definition of gerber types in test.
+
+Crates.io: https://crates.io/crates/gerber-types
+Github: https://github.com/MakerPnP/gerber-types
+
+### Gerber Parser
+
+A rust crate for parsing gerber files that uses this crate as a dependency:
+
+Crates.io: https://crates.io/crates/gerber-parser
+Github: https://github.com/MakerPnP/gerber-parser
+
+## Related projects
+
+For a list of other projects that use this crate you can check the github 'dependents' page.
+
+https://github.com/MakerPnP/gerber-types/network/dependents
+
 ## Authors
 
 * Dominic Clifton - Original author and maintainer. (https://ko-fi.com/dominicclifton)
@@ -118,3 +146,12 @@ open an issue first to state your intention, for bug fixes and small changes jus
 ## Contact / Community
 
 See the github issue tracker or join the [MakerPnP discord server](https://discord.gg/ffwj5rKZuf).
+
+<!-- Badges -->
+
+[build-status]: https://github.com/makerpnp/gerber-viewer/actions/workflows/ci.yml
+[build-status-badge]: https://github.com/makerpnp/gerber-viewer/workflows/CI/badge.svg
+[crates-io]: https://crates.io/crates/gerber-viewer
+[crates-io-badge]: https://img.shields.io/crates/v/gerber-viewer.svg
+[discord]: https://discord.gg/ffwj5rKZuf
+[discord-badge]: https://img.shields.io/discord/1255867192503832688?label=MakerPnP%20discord&color=%2332c955 
