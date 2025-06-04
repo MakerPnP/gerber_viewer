@@ -87,7 +87,7 @@ trait Renderable {
 }
 
 impl Renderable for CircleGerberPrimitive {
-    #[profiling::function]
+    #[cfg_attr(feature = "profile-renderables", profiling::function)]
     fn render(
         &self,
         painter: &Painter,
@@ -116,7 +116,7 @@ impl Renderable for CircleGerberPrimitive {
 }
 
 impl Renderable for RectangleGerberPrimitive {
-    #[profiling::function]
+    #[cfg_attr(feature = "profile-renderables", profiling::function)]
     fn render(
         &self,
         painter: &Painter,
@@ -195,7 +195,7 @@ impl Renderable for RectangleGerberPrimitive {
 }
 
 impl Renderable for LineGerberPrimitive {
-    #[profiling::function]
+    #[cfg_attr(feature = "profile-renderables", profiling::function)]
     fn render(
         &self,
         painter: &Painter,
@@ -231,7 +231,7 @@ impl Renderable for LineGerberPrimitive {
 }
 
 impl Renderable for ArcGerberPrimitive {
-    #[profiling::function]
+    #[cfg_attr(feature = "profile-renderables", profiling::function)]
     fn render(
         &self,
         painter: &Painter,
@@ -305,7 +305,7 @@ impl Renderable for ArcGerberPrimitive {
 }
 
 impl Renderable for PolygonGerberPrimitive {
-    #[profiling::function]
+    #[cfg_attr(feature = "profile-renderables", profiling::function)]
     fn render(
         &self,
         painter: &Painter,

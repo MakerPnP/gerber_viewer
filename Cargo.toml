@@ -43,6 +43,9 @@ types = []
 # include test helpers
 testing = []
 
+# enable to create profiling scopes for each type of gerber primitive
+profile-renderables = []
+
 [dev-dependencies]
 rstest = "0.25.0"
 env_logger = "0.11.8"
