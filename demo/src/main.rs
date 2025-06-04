@@ -3,8 +3,9 @@ use std::io::BufReader;
 use eframe::emath::{Rect, Vec2};
 use eframe::epaint::Color32;
 use egui::ViewportBuilder;
+use nalgebra::Vector2;
 use gerber_viewer::gerber_parser::parse;
-use gerber_viewer::{draw_arrow, draw_outline, draw_crosshair, BoundingBox, GerberLayer, GerberRenderer, Transform2D, Vector, ViewState, draw_marker, UiState, ToPosition};
+use gerber_viewer::{draw_arrow, draw_outline, draw_crosshair, BoundingBox, GerberLayer, GerberRenderer, Transform2D, ViewState, draw_marker, UiState, ToPosition};
 
 const ENABLE_UNIQUE_SHAPE_COLORS: bool = true;
 const ENABLE_POLYGON_NUMBERING: bool = false;
@@ -14,12 +15,12 @@ const INITIAL_ROTATION: f32 = 45.0_f32.to_radians();
 const MIRRORING: [bool; 2] = [false, false];
 
 // for mirroring and rotation
-const CENTER_OFFSET: Vector = Vector::new(15.0, 20.0);
+const CENTER_OFFSET: Vector2<f64> = Vector2::new(15.0, 20.0);
 //const CENTER_OFFSET: Vector = Vector::new(14.75, 6.0);
 
 // in EDA tools like DipTrace, a gerber offset can be specified when exporting gerbers, e.g. 10,5.
 // use negative offsets here to relocate the gerber back to 0,0, e.g. -10, -5
-const DESIGN_OFFSET: Vector = Vector::new(-5.0, -10.0);
+const DESIGN_OFFSET: Vector2<f64> = Vector2::new(-5.0, -10.0);
 //const DESIGN_OFFSET: Vector = Vector::new(-10.0, -10.0);
 
 // radius of the markers, in gerber coordinates

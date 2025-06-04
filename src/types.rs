@@ -1,4 +1,4 @@
-use crate::Position;
+use nalgebra::Point2;
 
 pub(crate) enum Winding {
     /// Aka 'Positive' in Geometry
@@ -8,7 +8,7 @@ pub(crate) enum Winding {
 }
 
 impl Winding {
-    pub(crate) fn from_vertices(vertices: &[Position]) -> Self {
+    pub(crate) fn from_vertices(vertices: &[Point2<f64>]) -> Self {
         let mut sum = 0.0;
         for i in 0..vertices.len() {
             let j = (i + 1) % vertices.len();

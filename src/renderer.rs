@@ -5,9 +5,9 @@ use egui::epaint::{
     Color32, ColorMode, FontId, Mesh, PathShape, PathStroke, Pos2, Rect, Shape, Stroke, StrokeKind, Vec2, Vertex,
 };
 use egui::Painter;
+use nalgebra::Vector2;
 
 use crate::layer::{GerberPrimitive, ViewState};
-use crate::spacial::Vector;
 use crate::{color, GerberLayer, Mirroring};
 use crate::{
     ArcGerberPrimitive, CircleGerberPrimitive, LineGerberPrimitive, PolygonGerberPrimitive, RectangleGerberPrimitive,
@@ -31,12 +31,12 @@ impl GerberRenderer {
         rotation: f32,
         mirroring: Mirroring,
         // in gerber coordinates
-        design_origin: Vector,
+        design_origin: Vector2<f64>,
         // in gerber coordinates
-        design_offset: Vector,
+        design_offset: Vector2<f64>,
     ) {
-        let relative_origin = Vector::new(design_origin.x, -design_origin.y);
-        let offset = Vector::new(design_offset.x, -design_offset.y);
+        let relative_origin = Vector2::new(design_origin.x, -design_origin.y);
+        let offset = Vector2::new(design_offset.x, -design_offset.y);
 
         let origin = relative_origin - offset;
 

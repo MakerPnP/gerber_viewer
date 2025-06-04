@@ -1363,6 +1363,7 @@ dependencies = [
  "egui",
  "env_logger",
  "gerber_viewer",
+ "nalgebra",
  "profiling",
  "puffin_http",
  "tracing",

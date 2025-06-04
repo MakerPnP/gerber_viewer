@@ -1,7 +1,7 @@
 use egui::{Pos2, Rect, Response, Ui};
 use log::trace;
+use nalgebra::Point2;
 
-use crate::spacial::Position;
 use crate::ViewState;
 
 #[derive(Debug, Default)]
@@ -11,7 +11,7 @@ pub struct UiState {
     pub origin_screen_pos: Pos2,
 
     // only valid if the mouse is over the viewport
-    pub cursor_gerber_coords: Option<Position>,
+    pub cursor_gerber_coords: Option<Point2<f64>>,
 }
 
 impl UiState {
@@ -21,7 +21,7 @@ impl UiState {
         self.handle_zooming(view_state, &response, ui);
 
         self.center_screen_pos = viewport.center();
-        self.origin_screen_pos = view_state.gerber_to_screen_coords(Position::new(0.0, 0.0));
+        self.origin_screen_pos = view_state.gerber_to_screen_coords(Point2::new(0.0, 0.0));
 
         trace!(
             "update. view_state: {:?}, viewport: {:?}, cursor_gerber_coords: {:?}",
