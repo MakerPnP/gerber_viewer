@@ -4,8 +4,7 @@ use eframe::emath::{Rect, Vec2};
 use eframe::epaint::Color32;
 use egui::ViewportBuilder;
 use gerber_viewer::gerber_parser::parse;
-use gerber_viewer::{draw_arrow, draw_outline, draw_crosshair, BoundingBox, GerberLayer, GerberRenderer, Transform2D, ViewState, draw_marker, UiState};
-use gerber_viewer::position::Vector;
+use gerber_viewer::{draw_arrow, draw_outline, draw_crosshair, BoundingBox, GerberLayer, GerberRenderer, Transform2D, Vector, ViewState, draw_marker, UiState};
 
 const ENABLE_UNIQUE_SHAPE_COLORS: bool = true;
 const ENABLE_POLYGON_NUMBERING: bool = false;

@@ -1,7 +1,7 @@
 #[cfg(feature = "egui")]
 use egui::epaint::Color32;
 
-use crate::Exposure;
+use crate::types::Exposure;
 
 #[cfg(feature = "egui")]
 pub fn generate_pastel_color(index: u64) -> Color32 {

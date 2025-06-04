@@ -31,6 +31,9 @@ log = "0.4"
 # Profiling
 profiling = { version = "1.0.16" }
 
+# Serialization
+serde = { version = "1.0.219", optional = true, features = ["derive"] }
+
 [features]
 default = ["types", "parser", "egui"]
 
@@ -41,6 +44,8 @@ egui = ["dep:egui"]
 parser = ["dep:gerber_parser"]
 # just adds a re-export of gerber-types, the gerber-types will still be used.
 types = []
+
+serde = ["dep:serde"]
 
 # include test helpers
 testing = []

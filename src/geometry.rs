@@ -1,7 +1,7 @@
 use egui::{Pos2, Vec2, Vec2b};
 use log::debug;
 
-use crate::position::Vector;
+use crate::spacial::Vector;
 use crate::Position;
 
 #[derive(Debug, Copy, Clone)]
@@ -257,7 +257,7 @@ mod bbox_tests {
     use rstest::rstest;
 
     use super::BoundingBox;
-    use crate::position::Vector;
+    use crate::spacial::Vector;
     use crate::Position;
 
     #[rstest]

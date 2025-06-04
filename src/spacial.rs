@@ -61,6 +61,7 @@ impl Vector {
 macro_rules! impl_constructor {
     ($name:ident, $t:ty) => {
         #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
+        #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
         pub struct $name {
             pub x: $t,
             pub y: $t,
@@ -295,17 +296,27 @@ macro_rules! impl_ops_rhs {
     };
 }
 
+// Represents an offset (vector) from a position
 impl_constructor!(Vector, f64);
 impl_consts!(Vector, f64);
 impl_invert!(Vector);
 impl_ops_self!(Vector);
 impl_ops_rhs!(Vector, f64);
 
+// Represents a point
 impl_constructor!(Position, f64);
 impl_consts!(Position, f64);
 impl_invert!(Position);
 impl_ops_self!(Position);
 impl_ops_rhs!(Position, f64);
+
+// Represents a size
+// not using terms like length/width/height because they are ambiguous
+impl_constructor!(Size, f64);
+impl_consts!(Size, f64);
+impl_invert!(Size);
+impl_ops_self!(Size);
+impl_ops_rhs!(Size, f64);
 
 pub mod deduplicate {
     use crate::Position;

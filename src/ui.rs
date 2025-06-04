@@ -1,7 +1,7 @@
 use egui::{Pos2, Rect, Response, Ui};
 use log::trace;
 
-use crate::position::Position;
+use crate::spacial::Position;
 use crate::ViewState;
 
 #[derive(Debug, Default)]

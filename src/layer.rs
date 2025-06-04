@@ -17,9 +17,9 @@ use super::gerber_types::{
     Aperture, ApertureDefinition, ApertureMacro, Command, Coordinates, DCode, ExtendedCode, FunctionCode, GCode,
     MacroContent, MacroDecimal, Operation, VariableDefinition,
 };
-use super::position::deduplicate::DedupEpsilon;
-use super::{calculate_winding, geometry, gerber_types};
-use super::{Exposure, Position, Winding};
+use super::spacial::deduplicate::DedupEpsilon;
+use super::{geometry, gerber_types, Position};
+use crate::types::{Exposure, Winding};
 
 #[derive(Clone, Debug)]
 pub struct GerberLayer {
@@ -59,7 +59,7 @@ impl GerberLayer {
         }
     }
 
-    pub fn primitives(&self) -> &[GerberPrimitive] {
+    pub(crate) fn primitives(&self) -> &[GerberPrimitive] {
         &self.gerber_primitives
     }
 }
@@ -1085,7 +1085,7 @@ enum ApertureKind {
 }
 
 #[derive(Debug, Clone)]
-pub enum GerberPrimitive {
+pub(crate) enum GerberPrimitive {
     Circle(CircleGerberPrimitive),
     Rectangle(RectangleGerberPrimitive),
     Line(LineGerberPrimitive),
@@ -1094,14 +1094,14 @@ pub enum GerberPrimitive {
 }
 
 #[derive(Debug, Clone)]
-pub struct CircleGerberPrimitive {
+pub(crate) struct CircleGerberPrimitive {
     pub center: Position,
     pub diameter: f64,
     pub exposure: Exposure,
 }
 
 #[derive(Debug, Clone)]
-pub struct RectangleGerberPrimitive {
+pub(crate) struct RectangleGerberPrimitive {
     pub origin: Position,
     pub width: f64,
     pub height: f64,
@@ -1109,7 +1109,7 @@ pub struct RectangleGerberPrimitive {
 }
 
 #[derive(Debug, Clone)]
-pub struct LineGerberPrimitive {
+pub(crate) struct LineGerberPrimitive {
     pub start: Position,
     pub end: Position,
     pub width: f64,
@@ -1117,14 +1117,14 @@ pub struct LineGerberPrimitive {
 }
 
 #[derive(Debug, Clone)]
-pub struct PolygonGerberPrimitive {
+pub(crate) struct PolygonGerberPrimitive {
     pub center: Position,
     pub exposure: Exposure,
     pub geometry: Arc<PolygonGeometry>,
 }
 
 #[derive(Debug, Clone)]
-pub struct ArcGerberPrimitive {
+pub(crate) struct ArcGerberPrimitive {
     pub center: Position,
     pub radius: f64,
     pub width: f64,
@@ -1188,7 +1188,7 @@ impl GerberPrimitive {
         let mut relative_vertices = polygon.vertices;
 
         // Calculate and fix winding order
-        let winding = calculate_winding(&relative_vertices);
+        let winding = Winding::from_vertices(&relative_vertices);
         if matches!(winding, Winding::Clockwise) {
             relative_vertices.reverse();
         }
@@ -1264,7 +1264,6 @@ mod circular_plotting_tests {
     use super::*;
     use crate::layer::{GerberLayer, GerberPrimitive};
     use crate::testing::dump_gerber_source;
-    use crate::Exposure;
 
     #[test]
     fn test_rounded_rectangle_outline() {
@@ -1654,9 +1653,10 @@ mod circle_aperture_tests {
         ExtendedCode, FunctionCode, Operation, Unit,
     };
 
-    use crate::position::Position;
+    use crate::spacial::Position;
     use crate::testing::dump_gerber_source;
-    use crate::{ArcGerberPrimitive, Exposure};
+    use crate::types::Exposure;
+    use crate::ArcGerberPrimitive;
     use crate::{GerberLayer, GerberPrimitive};
 
     #[test]
@@ -1749,7 +1749,7 @@ mod bounding_box_arc_tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::position::Position;
+    use crate::spacial::Position;
 
     // Helper function to create a test arc
     fn create_arc_primitive(

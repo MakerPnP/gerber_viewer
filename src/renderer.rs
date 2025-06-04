@@ -7,7 +7,7 @@ use egui::epaint::{
 use egui::Painter;
 
 use crate::layer::{GerberPrimitive, ViewState};
-use crate::position::Vector;
+use crate::spacial::Vector;
 use crate::{color, GerberLayer, Mirroring};
 use crate::{
     ArcGerberPrimitive, CircleGerberPrimitive, LineGerberPrimitive, PolygonGerberPrimitive, RectangleGerberPrimitive,
