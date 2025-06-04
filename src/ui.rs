@@ -1,8 +1,8 @@
 use egui::{Pos2, Rect, Response, Ui};
 use log::trace;
 
-use crate::ViewState;
 use crate::position::Position;
+use crate::ViewState;
 
 #[derive(Debug, Default)]
 pub struct UiState {
@@ -25,7 +25,9 @@ impl UiState {
 
         trace!(
             "update. view_state: {:?}, viewport: {:?}, cursor_gerber_coords: {:?}",
-            view_state, viewport, self.cursor_gerber_coords
+            view_state,
+            viewport,
+            self.cursor_gerber_coords
         )
     }
 

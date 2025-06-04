@@ -1,18 +1,18 @@
 use std::sync::Arc;
 
-use egui::Painter;
 use egui::epaint::emath::Align2;
 use egui::epaint::{
     Color32, ColorMode, FontId, Mesh, PathShape, PathStroke, Pos2, Rect, Shape, Stroke, StrokeKind, Vec2, Vertex,
 };
+use egui::Painter;
 
 use crate::layer::{GerberPrimitive, ViewState};
 use crate::position::Vector;
+use crate::{color, GerberLayer, Mirroring};
 use crate::{
     ArcGerberPrimitive, CircleGerberPrimitive, LineGerberPrimitive, PolygonGerberPrimitive, RectangleGerberPrimitive,
     Transform2D,
 };
-use crate::{GerberLayer, Mirroring, color};
 
 #[derive(Default)]
 pub struct GerberRenderer {}

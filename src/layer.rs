@@ -2,15 +2,15 @@ use std::collections::{HashMap, HashSet};
 use std::ops::Add;
 use std::sync::Arc;
 
-use egui::Pos2;
 #[cfg(feature = "egui")]
 use egui::epaint::emath::Vec2;
+use egui::Pos2;
 use gerber_types::{Circle, InterpolationMode, QuadrantMode};
 use log::{debug, error, info, trace, warn};
 
 use super::expressions::{
-    ExpressionEvaluationError, MacroContext, evaluate_expression, macro_boolean_to_bool, macro_decimal_pair_to_f64,
-    macro_decimal_to_f64, macro_integer_to_u32,
+    evaluate_expression, macro_boolean_to_bool, macro_decimal_pair_to_f64, macro_decimal_to_f64, macro_integer_to_u32,
+    ExpressionEvaluationError, MacroContext,
 };
 use super::geometry::{BoundingBox, PolygonMesh};
 use super::gerber_types::{
@@ -18,8 +18,8 @@ use super::gerber_types::{
     MacroContent, MacroDecimal, Operation, VariableDefinition,
 };
 use super::position::deduplicate::DedupEpsilon;
-use super::{Exposure, Position, Winding};
 use super::{calculate_winding, geometry, gerber_types};
+use super::{Exposure, Position, Winding};
 
 #[derive(Clone, Debug)]
 pub struct GerberLayer {
@@ -1262,9 +1262,9 @@ mod circular_plotting_tests {
     };
 
     use super::*;
-    use crate::Exposure;
     use crate::layer::{GerberLayer, GerberPrimitive};
     use crate::testing::dump_gerber_source;
+    use crate::Exposure;
 
     #[test]
     fn test_rounded_rectangle_outline() {

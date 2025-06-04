@@ -1,8 +1,8 @@
 use egui::{Pos2, Vec2, Vec2b};
 use log::debug;
 
-use crate::Position;
 use crate::position::Vector;
+use crate::Position;
 
 #[derive(Debug, Copy, Clone)]
 pub struct Mirroring {
@@ -257,8 +257,8 @@ mod bbox_tests {
     use rstest::rstest;
 
     use super::BoundingBox;
-    use crate::Position;
     use crate::position::Vector;
+    use crate::Position;
 
     #[rstest]
     #[case(BoundingBox::default(), true)]
