@@ -1257,8 +1257,8 @@ mod circular_plotting_tests {
     use std::f64::consts::{FRAC_PI_2, PI};
 
     use gerber_types::{
-        Command, CoordinateFormat, CoordinateNumber, CoordinateOffset, Coordinates, DCode, GCode,
-        InterpolationMode, Operation, Unit,
+        Command, CoordinateFormat, CoordinateNumber, CoordinateOffset, Coordinates, DCode, GCode, InterpolationMode,
+        Operation, Unit,
     };
 
     use super::*;
