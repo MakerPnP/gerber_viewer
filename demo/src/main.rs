@@ -5,7 +5,7 @@ use eframe::epaint::Color32;
 use egui::ViewportBuilder;
 use nalgebra::Vector2;
 use gerber_viewer::gerber_parser::parse;
-use gerber_viewer::{draw_arrow, draw_outline, draw_crosshair, BoundingBox, GerberLayer, GerberRenderer, Transform2D, ViewState, draw_marker, UiState, ToPosition, Invert};
+use gerber_viewer::{draw_arrow, draw_outline, draw_crosshair, BoundingBox, GerberLayer, GerberRenderer, Transform2D, ViewState, draw_marker, UiState, ToPosition, Invert, ToVector};
 
 const ENABLE_UNIQUE_SHAPE_COLORS: bool = true;
 const ENABLE_POLYGON_NUMBERING: bool = false;
@@ -15,13 +15,13 @@ const INITIAL_ROTATION: f32 = 45.0_f32.to_radians();
 const MIRRORING: [bool; 2] = [false, false];
 
 // for mirroring and rotation
-const CENTER_OFFSET: Vector2<f64> = Vector2::new(0.0, 0.0);
-//const CENTER_OFFSET: Vector2<f64> = Vector2::new(14.75, 6.0);
+//const CENTER_OFFSET: Vector2<f64> = Vector2::new(0.0, 0.0);
+const CENTER_OFFSET: Vector2<f64> = Vector2::new(14.75, 6.0);
 
 // in EDA tools like DipTrace, a gerber offset can be specified when exporting gerbers, e.g. 10,5.
 // use negative offsets here to relocate the gerber back to 0,0, e.g. -10, -5
-const DESIGN_OFFSET: Vector2<f64> = Vector2::new(0.0, 0.0);
-//const DESIGN_OFFSET: Vector2<f64> = Vector2::new(-10.0, -10.0);
+//const DESIGN_OFFSET: Vector2<f64> = Vector2::new(0.0, 0.0);
+const DESIGN_OFFSET: Vector2<f64> = Vector2::new(-10.0, -10.0);
 
 // radius of the markers, in gerber coordinates
 const MARKER_RADIUS: f32 = 2.5;
@@ -82,16 +82,40 @@ impl DemoApp {
         // adjust slightly to add a margin
         let scale = scale * 0.95;
 
-        let center = bbox.center();
+        // Create the same transform that will be used in update()
+        let origin = CENTER_OFFSET - DESIGN_OFFSET;
+        let transform = Transform2D {
+            rotation_radians: self.rotation_radians,
+            mirroring: MIRRORING.into(),
+            origin,
+            offset: DESIGN_OFFSET,
+        };
 
-        // Offset from viewport center to place content in the center
+        // Compute transformed bounding box
+        let outline_vertices: Vec<_> = bbox
+            .vertices()
+            .into_iter()
+            .map(|v| transform.apply_to_position(v))
+            .collect();
+
+        let transformed_bbox = BoundingBox::from_points(&outline_vertices);
+
+        // Use the center of the transformed bounding box
+        let transformed_center = transformed_bbox.center();
+
         self.view_state.translation = Vec2::new(
-            viewport.center().x - (center.x as f32 * scale),
-            viewport.center().y + (center.y as f32 * scale), // Note the + here since we flip Y
+            viewport.center().x - (transformed_center.x as f32 * scale),
+            viewport.center().y + (transformed_center.y as f32 * scale),
         );
 
         self.view_state.scale = scale;
         self.needs_initial_view = false;
+
+        println!("scale: {}", self.view_state.scale);
+        println!("translation: {:?}", self.view_state.translation);
+        println!("bbox: {:?}", bbox);
+        println!("viewport: {:?}", viewport)
+
     }
 }
 
