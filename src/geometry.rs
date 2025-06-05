@@ -70,9 +70,10 @@ impl Transform2D {
             y = -y;
         }
 
+        // Point2 are in GERBER coordinates, Positive Y = UP so we do a normal rotation
         let (sin_theta, cos_theta) = (-self.rotation_radians as f64).sin_cos();
-        let rotated_x = x * cos_theta - y * sin_theta;
-        let rotated_y = x * sin_theta + y * cos_theta;
+        let rotated_x = x * cos_theta + y * sin_theta;
+        let rotated_y = -x * sin_theta + y * cos_theta;
 
         Point2::new(
             rotated_x + self.origin.x + self.offset.x,
@@ -91,8 +92,9 @@ impl Transform2D {
         if self.mirroring.y {
             y = -y;
         }
-
-        let (sin_theta, cos_theta) = (self.rotation_radians as f64).sin_cos();
+        
+        // Pos 2 are in SCREEN coordinates, Positive Y = DOWN so we need to invert the rotation
+        let (sin_theta, cos_theta) = (-self.rotation_radians as f64).sin_cos();
         let rotated_x = x * cos_theta - y * sin_theta;
         let rotated_y = x * sin_theta + y * cos_theta;
 
