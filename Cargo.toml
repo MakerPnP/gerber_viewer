@@ -21,6 +21,7 @@ gerber_parser = { git = "https://github.com/makerpnp/gerber-parser.git", rev = "
 # Math
 rand = "0.9.1"
 lyon = "1.0"
+nalgebra = { version = "0.33.2" , default-features = false }
 
 # Errors
 thiserror = "2.0.12"

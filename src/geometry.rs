@@ -1,8 +1,6 @@
 use egui::{Pos2, Vec2, Vec2b};
 use log::debug;
-
-use crate::spacial::Vector;
-use crate::Position;
+use nalgebra::{Point2, Vector2};
 
 #[derive(Debug, Copy, Clone)]
 pub struct Mirroring {
@@ -54,14 +52,14 @@ pub struct Transform2D {
     pub rotation_radians: f32,
     pub mirroring: Mirroring,
     // origin for rotation and mirroring, in gerber coordinates
-    pub origin: Vector,
+    pub origin: Vector2<f64>,
     // offset, in gerber coordinates
-    pub offset: Vector,
+    pub offset: Vector2<f64>,
 }
 
 impl Transform2D {
-    /// Apply the transform to a logical `Position` (Gerber-space)
-    pub fn apply_to_position(&self, pos: Position) -> Position {
+    /// Apply the transform to a logical `Point2` (Gerber-space)
+    pub fn apply_to_position(&self, pos: Point2<f64>) -> Point2<f64> {
         let mut x = pos.x - self.origin.x;
         let mut y = pos.y - self.origin.y;
 
@@ -76,13 +74,13 @@ impl Transform2D {
         let rotated_x = x * cos_theta - y * sin_theta;
         let rotated_y = x * sin_theta + y * cos_theta;
 
-        Position::new(
+        Point2::new(
             rotated_x + self.origin.x + self.offset.x,
             rotated_y + self.origin.y + self.offset.y,
         )
     }
 
-    /// Apply transform to a Vec2 instead of Position (used for bbox drawing)
+    /// Apply transform to a Vec2 instead of Point2 (used for bbox drawing)
     pub fn apply_to_pos2(&self, pos: Pos2) -> Vec2 {
         let mut x = pos.x as f64 - self.origin.x;
         let mut y = pos.y as f64 - self.origin.y;
@@ -107,13 +105,13 @@ impl Transform2D {
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct BoundingBox {
-    pub min: Position,
-    pub max: Position,
+    pub min: Point2<f64>,
+    pub max: Point2<f64>,
 }
 
 impl BoundingBox {
     /// Use to generate an outline of the bbox
-    pub fn transform_vertices(&self, transform: Transform2D) -> Vec<Position> {
+    pub fn transform_vertices(&self, transform: Transform2D) -> Vec<Point2<f64>> {
         self.vertices()
             .into_iter()
             .map(|v| transform.apply_to_position(v))
@@ -131,8 +129,8 @@ impl BoundingBox {
 impl Default for BoundingBox {
     fn default() -> Self {
         Self {
-            min: Position::MAX,
-            max: Position::MIN,
+            min: Point2::new(f64::MAX, f64::MAX),
+            max: Point2::new(f64::MIN, f64::MIN),
         }
     }
 }
@@ -171,19 +169,15 @@ impl BoundingBox {
     }
 
     /// Returns a new bounding box with X and/or Y mirroring applied.
-    pub fn apply_mirroring(&self, mirror_x: bool, mirror_y: bool, offset: Vector) -> Self {
+    pub fn apply_mirroring(&self, mirror_x: bool, mirror_y: bool, offset: Vector2<f64>) -> Self {
         let mut vertices = self.vertices();
 
-        for Position {
-            x,
-            y,
-        } in &mut vertices
-        {
+        for position in &mut vertices {
             if mirror_x {
-                *x = offset.x - (*x - offset.x);
+                position.x = offset.x - (position.x - offset.x);
             }
             if mirror_y {
-                *y = offset.y - (*y - offset.y);
+                position.y = offset.y - (position.y - offset.y);
             }
         }
 
@@ -191,7 +185,7 @@ impl BoundingBox {
     }
 
     /// Returns a new bounding box rotated around origin (0, 0) by given angle in radians.
-    pub fn apply_rotation(&self, radians: f64, offset: Vector) -> Self {
+    pub fn apply_rotation(&self, radians: f64, offset: Vector2<f64>) -> Self {
         let (sin_theta, cos_theta) = radians.sin_cos();
         let mut corners = self.vertices();
 
@@ -209,9 +203,9 @@ impl BoundingBox {
         Self::from_points(&corners)
     }
 
-    /// Returns the geometric center of the bounding box as a Position
-    pub fn center(&self) -> Position {
-        (self.min + self.max) / 2.0
+    /// Returns the geometric center of the bounding box as a Point2
+    pub fn center(&self) -> Point2<f64> {
+        Point2::new(self.min.x + self.max.x, self.min.y + self.max.y) / 2.0
     }
 
     /// Returns 4 corner points of the bounding box such that the result is useable as a closed path.
@@ -220,29 +214,25 @@ impl BoundingBox {
     ///                  │            │
     /// (min_x, max_y) 4 └────────────┘ 3 (max_x, max_y)
     /// ```
-    pub fn vertices(&self) -> Vec<Position> {
+    pub fn vertices(&self) -> Vec<Point2<f64>> {
         vec![
-            Position::new(self.min.x, self.min.y),
-            Position::new(self.max.x, self.min.y),
-            Position::new(self.max.x, self.max.y),
-            Position::new(self.min.x, self.max.y),
+            Point2::new(self.min.x, self.min.y),
+            Point2::new(self.max.x, self.min.y),
+            Point2::new(self.max.x, self.max.y),
+            Point2::new(self.min.x, self.max.y),
         ]
     }
 
     /// Constructs a bounding box from a list of points
-    pub fn from_points(points: &[Position]) -> Self {
-        let mut min = Position::MAX;
-        let mut max = Position::MIN;
+    pub fn from_points(points: &[Point2<f64>]) -> Self {
+        let mut min = Point2::new(f64::MAX, f64::MAX);
+        let mut max = Point2::new(f64::MIN, f64::MIN);
 
-        for &Position {
-            x,
-            y,
-        } in points
-        {
-            min.x = min.x.min(x);
-            min.y = min.y.min(y);
-            max.x = max.x.max(x);
-            max.y = max.y.max(y);
+        for position in points {
+            min.x = min.x.min(position.x);
+            min.y = min.y.min(position.y);
+            max.x = max.x.max(position.x);
+            max.y = max.y.max(position.y);
         }
 
         Self {
@@ -254,16 +244,15 @@ impl BoundingBox {
 
 #[cfg(test)]
 mod bbox_tests {
+    use nalgebra::{Point2, Vector2};
     use rstest::rstest;
 
     use super::BoundingBox;
-    use crate::spacial::Vector;
-    use crate::Position;
 
     #[rstest]
     #[case(BoundingBox::default(), true)]
-    #[case(BoundingBox { min: Position::new(0.0, 0.0), max: Position::new(0.0, 0.0) }, false)]
-    #[case(BoundingBox { min: Position::new(-10.0, -10.0), max: Position::new(10.0, 10.0) }, false)]
+    #[case(BoundingBox { min: Point2::new(0.0, 0.0), max: Point2::new(0.0, 0.0) }, false)]
+    #[case(BoundingBox { min: Point2::new(-10.0, -10.0), max: Point2::new(10.0, 10.0) }, false)]
     pub fn test_is_empty(#[case] input: BoundingBox, #[case] expected: bool) {
         assert_eq!(input.is_empty(), expected);
     }
@@ -271,11 +260,11 @@ mod bbox_tests {
     #[test]
     pub fn test_apply_rotation_90_degrees_zero_offset() {
         let bbox = BoundingBox {
-            min: Position::new(1.0, 2.0),
-            max: Position::new(3.0, 4.0),
+            min: Point2::new(1.0, 2.0),
+            max: Point2::new(3.0, 4.0),
         };
 
-        let rotated = bbox.apply_rotation(std::f64::consts::FRAC_PI_2, Vector::ZERO); // 90 degrees
+        let rotated = bbox.apply_rotation(std::f64::consts::FRAC_PI_2, Vector2::new(0.0, 0.0)); // 90 degrees
 
         // Expected:
         // Points rotate CCW around origin:
@@ -304,14 +293,8 @@ mod bbox_tests {
     fn test_geometric_center(#[case] origin: (f64, f64), #[case] size: (f64, f64), #[case] expected: (f64, f64)) {
         // Create bounding box from origin and size
         let bbox = BoundingBox {
-            min: Position {
-                x: origin.0,
-                y: origin.1,
-            },
-            max: Position {
-                x: origin.0 + size.0,
-                y: origin.1 + size.1,
-            },
+            min: Point2::new(origin.0, origin.1),
+            max: Point2::new(origin.0 + size.0, origin.1 + size.1),
         };
 
         let center = bbox.center();
@@ -333,7 +316,7 @@ mod bbox_tests {
     }
 }
 
-pub fn is_convex(vertices: &[Position]) -> bool {
+pub fn is_convex(vertices: &[Point2<f64>]) -> bool {
     if vertices.len() < 3 {
         return true;
     }
@@ -368,7 +351,7 @@ pub struct PolygonMesh {
     pub indices: Vec<u32>,
 }
 
-pub fn tessellate_polygon(vertices: &[Position]) -> PolygonMesh {
+pub fn tessellate_polygon(vertices: &[Point2<f64>]) -> PolygonMesh {
     use lyon::path::Path;
     use lyon::tessellation::{BuffersBuilder, FillOptions, FillRule, FillTessellator, VertexBuffers};
 

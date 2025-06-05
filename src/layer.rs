@@ -7,6 +7,7 @@ use egui::epaint::emath::Vec2;
 use egui::Pos2;
 use gerber_types::{Circle, InterpolationMode, QuadrantMode};
 use log::{debug, error, info, trace, warn};
+use nalgebra::{Point2, Vector2};
 
 use super::expressions::{
     evaluate_expression, macro_boolean_to_bool, macro_decimal_pair_to_f64, macro_decimal_to_f64, macro_integer_to_u32,
@@ -18,7 +19,7 @@ use super::gerber_types::{
     MacroContent, MacroDecimal, Operation, VariableDefinition,
 };
 use super::spacial::deduplicate::DedupEpsilon;
-use super::{geometry, gerber_types, Position};
+use super::{geometry, gerber_types, Invert, ToPos2};
 use crate::types::{Exposure, Winding};
 
 #[derive(Clone, Debug)]
@@ -77,8 +78,8 @@ impl WithBoundingBox for CircleGerberPrimitive {
         } = self;
         let radius = diameter / 2.0;
         BoundingBox {
-            min: Position::new(center.x - radius, center.y - radius),
-            max: Position::new(center.x + radius, center.y + radius),
+            min: Point2::new(center.x - radius, center.y - radius),
+            max: Point2::new(center.x + radius, center.y + radius),
         }
     }
 }
@@ -112,8 +113,8 @@ impl WithBoundingBox for ArcGerberPrimitive {
 
         // Always include center point in bounding box for arcs
         let mut bbox = BoundingBox {
-            min: Position::new(center.x, center.y),
-            max: Position::new(center.x, center.y),
+            min: Point2::new(center.x, center.y),
+            max: Point2::new(center.x, center.y),
         };
 
         // Sample all points including the first one
@@ -130,8 +131,8 @@ impl WithBoundingBox for ArcGerberPrimitive {
 
             // Update bounding box with stroke width
             let stroke_bbox = BoundingBox {
-                min: Position::new(x - half_width, y - half_width),
-                max: Position::new(x + half_width, y + half_width),
+                min: Point2::new(x - half_width, y - half_width),
+                max: Point2::new(x + half_width, y + half_width),
             };
             bbox.expand(&stroke_bbox);
         }
@@ -149,8 +150,8 @@ impl WithBoundingBox for RectangleGerberPrimitive {
             ..
         } = self;
         BoundingBox {
-            min: Position::new(origin.x, origin.y),
-            max: Position::new(origin.x + width, origin.y + height),
+            min: Point2::new(origin.x, origin.y),
+            max: Point2::new(origin.x + width, origin.y + height),
         }
     }
 }
@@ -166,12 +167,12 @@ impl WithBoundingBox for LineGerberPrimitive {
 
         let radius = width / 2.0;
         let mut bbox = BoundingBox {
-            min: Position::new(start.x - radius, start.y - radius),
-            max: Position::new(start.x + radius, start.y + radius),
+            min: Point2::new(start.x - radius, start.y - radius),
+            max: Point2::new(start.x + radius, start.y + radius),
         };
         let end_bbox = BoundingBox {
-            min: Position::new(end.x - radius, end.y - radius),
-            max: Position::new(end.x + radius, end.y + radius),
+            min: Point2::new(end.x - radius, end.y - radius),
+            max: Point2::new(end.x + radius, end.y + radius),
         };
         bbox.expand(&end_bbox);
 
@@ -187,10 +188,12 @@ impl WithBoundingBox for PolygonGerberPrimitive {
             ..
         } = self;
 
+        let center: Vector2<f64> = center.coords;
+
         let points = geometry
             .relative_vertices
             .iter()
-            .map(|position| position.add(*center))
+            .map(|position| position.add(center))
             .collect::<Vec<_>>();
 
         BoundingBox::from_points(&points)
@@ -198,8 +201,8 @@ impl WithBoundingBox for PolygonGerberPrimitive {
 }
 
 impl GerberLayer {
-    fn update_position(current_pos: &mut Position, coords: &Coordinates) {
-        *current_pos = (
+    fn update_position(current_pos: &mut Point2<f64>, coords: &Coordinates) {
+        let (x, y) = (
             coords
                 .x
                 .map(|value| value.into())
@@ -208,8 +211,9 @@ impl GerberLayer {
                 .y
                 .map(|value| value.into())
                 .unwrap_or(current_pos.y),
-        )
-            .into()
+        );
+
+        *current_pos = Point2::new(x, y);
     }
 
     fn calculate_bounding_box(primitives: &Vec<GerberPrimitive>) -> BoundingBox {
@@ -358,7 +362,7 @@ impl GerberLayer {
                                             let rotated_y = center_x * sin_theta + center_y * cos_theta;
 
                                             Ok(Some(GerberPrimitive::Circle(CircleGerberPrimitive {
-                                                center: (rotated_x, rotated_y).into(),
+                                                center: Point2::new(rotated_x, rotated_y),
                                                 diameter,
                                                 exposure: macro_boolean_to_bool(&circle.exposure, macro_context)?
                                                     .into(),
@@ -417,11 +421,11 @@ impl GerberLayer {
                                             // Convert to relative vertices
                                             let vertices = corners
                                                 .iter()
-                                                .map(|&(x, y)| Position::new(x - center_x, y - center_y))
+                                                .map(|&(x, y)| Point2::new(x - center_x, y - center_y))
                                                 .collect();
 
                                             Ok(Some(GerberPrimitive::new_polygon(GerberPolygon {
-                                                center: Position::new(center_x, center_y),
+                                                center: Point2::new(center_x, center_y),
                                                 vertices,
                                                 exposure: macro_boolean_to_bool(&vector_line.exposure, macro_context)?
                                                     .into(),
@@ -444,10 +448,10 @@ impl GerberLayer {
 
                                             // Define unrotated vertices relative to center
                                             let unrotated_vertices = [
-                                                Position::new(half_length, half_width),
-                                                Position::new(-half_length, half_width),
-                                                Position::new(-half_length, -half_width),
-                                                Position::new(half_length, -half_width),
+                                                Point2::new(half_length, half_width),
+                                                Point2::new(-half_length, half_width),
+                                                Point2::new(-half_length, -half_width),
+                                                Point2::new(half_length, -half_width),
                                             ];
 
                                             // Rotate each vertex relative to the center
@@ -456,12 +460,12 @@ impl GerberLayer {
                                                 .map(|pos| {
                                                     let x = pos.x * cos_theta - pos.y * sin_theta;
                                                     let y = pos.x * sin_theta + pos.y * cos_theta;
-                                                    Position::new(x, y)
+                                                    Point2::new(x, y)
                                                 })
                                                 .collect();
 
                                             Ok(Some(GerberPrimitive::new_polygon(GerberPolygon {
-                                                center: Position::new(center_x, center_y),
+                                                center: Point2::new(center_x, center_y),
                                                 vertices,
                                                 exposure: macro_boolean_to_bool(&center_line.exposure, macro_context)?
                                                     .into(),
@@ -475,12 +479,12 @@ impl GerberLayer {
                                             }
 
                                             // Get vertices - points are already relative to (0,0)
-                                            let mut vertices: Vec<Position> = outline
+                                            let mut vertices: Vec<Point2<f64>> = outline
                                                 .points
                                                 .iter()
                                                 .filter_map(|point| {
                                                     macro_decimal_pair_to_f64(point, macro_context)
-                                                        .map(|d| d.into())
+                                                        .map(|(x, y)| Point2::new(x, y))
                                                         .inspect_err(|err| {
                                                             error!("Error building vertex: {}", err);
                                                         })
@@ -497,21 +501,16 @@ impl GerberLayer {
                                                 let (sin_theta, cos_theta) = rotation_radians.sin_cos();
                                                 vertices = vertices
                                                     .into_iter()
-                                                    .map(
-                                                        |Position {
-                                                             x,
-                                                             y,
-                                                         }| {
-                                                            let rotated_x = x * cos_theta - y * sin_theta;
-                                                            let rotated_y = x * sin_theta + y * cos_theta;
-                                                            (rotated_x, rotated_y).into()
-                                                        },
-                                                    )
+                                                    .map(|position| {
+                                                        let rotated_x = position.x * cos_theta - position.y * sin_theta;
+                                                        let rotated_y = position.x * sin_theta + position.y * cos_theta;
+                                                        Point2::new(rotated_x, rotated_y)
+                                                    })
                                                     .collect();
                                             }
 
                                             Ok(Some(GerberPrimitive::new_polygon(GerberPolygon {
-                                                center: (0.0, 0.0).into(), // The flash operation will move this to final position
+                                                center: Point2::new(0.0, 0.0), // The flash operation will move this to final position
                                                 vertices,
                                                 exposure: macro_boolean_to_bool(&outline.exposure, macro_context)?
                                                     .into(),
@@ -540,7 +539,7 @@ impl GerberLayer {
                                                 let rotated_x = x * cos_theta - y * sin_theta;
                                                 let rotated_y = x * sin_theta + y * cos_theta;
 
-                                                vertices.push((rotated_x, rotated_y).into());
+                                                vertices.push(Point2::new(rotated_x, rotated_y));
                                             }
 
                                             // Rotate center point around macro origin
@@ -549,7 +548,7 @@ impl GerberLayer {
                                             let rotated_center_y = center.0 * sin_theta + center.1 * cos_theta;
 
                                             Ok(Some(GerberPrimitive::new_polygon(GerberPolygon {
-                                                center: (rotated_center_x, rotated_center_y).into(),
+                                                center: Point2::new(rotated_center_x, rotated_center_y),
                                                 vertices,
                                                 exposure: macro_boolean_to_bool(&polygon.exposure, macro_context)?
                                                     .into(),
@@ -626,7 +625,7 @@ impl GerberLayer {
 
         let mut layer_primitives = Vec::new();
         let mut current_aperture = None;
-        let mut current_pos = Position::ZERO;
+        let mut current_pos = Point2::new(0.0, 0.0);
         let mut current_aperture_width = 0.0;
         let mut interpolation_mode = InterpolationMode::Linear;
         let mut quadrant_mode = QuadrantMode::Single;
@@ -635,7 +634,7 @@ impl GerberLayer {
         let mut aperture_selection_errors: HashSet<i32> = HashSet::new();
 
         // regions are a special case - they are defined by aperture codes
-        let mut current_region_vertices: Vec<Position> = Vec::new();
+        let mut current_region_vertices: Vec<Point2<f64>> = Vec::new();
         let mut in_region = false;
 
         for cmd in commands.iter() {
@@ -657,51 +656,35 @@ impl GerberLayer {
                             // Find bounding box
                             let min_x = current_region_vertices
                                 .iter()
-                                .map(
-                                    |Position {
-                                         x, ..
-                                     }| *x,
-                                )
+                                .map(|position| position.x)
                                 .fold(f64::INFINITY, f64::min);
                             let max_x = current_region_vertices
                                 .iter()
-                                .map(
-                                    |Position {
-                                         x, ..
-                                     }| *x,
-                                )
+                                .map(|position| position.x)
                                 .fold(f64::NEG_INFINITY, f64::max);
                             let min_y = current_region_vertices
                                 .iter()
-                                .map(
-                                    |Position {
-                                         y, ..
-                                     }| *y,
-                                )
+                                .map(|position| position.y)
                                 .fold(f64::INFINITY, f64::min);
                             let max_y = current_region_vertices
                                 .iter()
-                                .map(
-                                    |Position {
-                                         y, ..
-                                     }| *y,
-                                )
+                                .map(|position| position.y)
                                 .fold(f64::NEG_INFINITY, f64::max);
 
                             // Calculate center from bounding box
                             let center_x = (min_x + max_x) / 2.0;
                             let center_y = (min_y + max_y) / 2.0;
 
-                            let center = Position::new(center_x, center_y);
+                            let center = Vector2::new(center_x, center_y);
 
                             // Make vertices relative to center
-                            let relative_vertices: Vec<Position> = current_region_vertices
+                            let relative_vertices: Vec<Point2<f64>> = current_region_vertices
                                 .iter()
                                 .map(|position| *position - center)
                                 .collect();
 
                             let polygon = GerberPrimitive::new_polygon(GerberPolygon {
-                                center: (center_x, center_y).into(),
+                                center: Point2::new(center_x, center_y),
                                 vertices: relative_vertices,
                                 exposure: Exposure::Add,
                             });
@@ -786,10 +769,7 @@ impl GerberLayer {
                                             // Calculate center of the arc
                                             let center_x = current_pos.x + offset_i;
                                             let center_y = current_pos.y + offset_j;
-                                            let center = Position {
-                                                x: center_x,
-                                                y: center_y,
-                                            };
+                                            let center = Point2::new(center_x, center_y);
 
                                             // Calculate radius (distance from current position to center)
                                             let radius = ((offset_i * offset_i) + (offset_j * offset_j)).sqrt();
@@ -886,31 +866,31 @@ impl GerberLayer {
                                                         center,
                                                         ..
                                                     }) => {
-                                                        *center += current_pos;
+                                                        *center += Vector2::new(current_pos.x, current_pos.y);
                                                     }
                                                     GerberPrimitive::Circle(CircleGerberPrimitive {
                                                         center, ..
                                                     }) => {
-                                                        *center += current_pos;
+                                                        *center += Vector2::new(current_pos.x, current_pos.y);
                                                     }
                                                     GerberPrimitive::Arc(ArcGerberPrimitive {
                                                         center, ..
                                                     }) => {
-                                                        *center += current_pos;
+                                                        *center += Vector2::new(current_pos.x, current_pos.y);
                                                     }
                                                     GerberPrimitive::Rectangle(RectangleGerberPrimitive {
                                                         origin,
                                                         ..
                                                     }) => {
-                                                        *origin += current_pos;
+                                                        *origin += Vector2::new(current_pos.x, current_pos.y);
                                                     }
                                                     GerberPrimitive::Line(LineGerberPrimitive {
                                                         start,
                                                         end,
                                                         ..
                                                     }) => {
-                                                        *start += current_pos;
-                                                        *end += current_pos;
+                                                        *start += Vector2::new(current_pos.x, current_pos.y);
+                                                        *end += Vector2::new(current_pos.x, current_pos.y);
                                                     }
                                                 }
                                                 trace!("flashing macro primitive: {:?}", primitive);
@@ -955,7 +935,7 @@ impl GerberLayer {
                                                 Aperture::Rectangle(rect) => {
                                                     layer_primitives.push(GerberPrimitive::Rectangle(
                                                         RectangleGerberPrimitive {
-                                                            origin: Position::new(
+                                                            origin: Point2::new(
                                                                 current_pos.x - rect.x / 2.0,
                                                                 current_pos.y - rect.y / 2.0,
                                                             ),
@@ -982,10 +962,12 @@ impl GerberLayer {
                                                         let final_position = if let Some(rotation) = polygon.rotation {
                                                             let rot_rad = rotation * std::f64::consts::PI / 180.0;
                                                             let (sin_rot, cos_rot) = rot_rad.sin_cos();
-                                                            (x * cos_rot - y * sin_rot, x * sin_rot + y * cos_rot)
-                                                                .into()
+                                                            Point2::new(
+                                                                x * cos_rot - y * sin_rot,
+                                                                x * sin_rot + y * cos_rot,
+                                                            )
                                                         } else {
-                                                            (x, y).into()
+                                                            Point2::new(x, y)
                                                         };
 
                                                         vertices.push(final_position);
@@ -1026,7 +1008,7 @@ impl GerberLayer {
                                                     // Add the center rectangle
                                                     layer_primitives.push(GerberPrimitive::Rectangle(
                                                         RectangleGerberPrimitive {
-                                                            origin: Position::new(
+                                                            origin: Point2::new(
                                                                 current_pos.x - rect_width / 2.0,
                                                                 current_pos.y - rect_height / 2.0,
                                                             ),
@@ -1041,7 +1023,7 @@ impl GerberLayer {
                                                     for (dx, dy) in circle_centers {
                                                         layer_primitives.push(GerberPrimitive::Circle(
                                                             CircleGerberPrimitive {
-                                                                center: current_pos + Position::from((dx, dy)),
+                                                                center: current_pos + Vector2::new(dx, dy),
                                                                 diameter: circle_radius * 2.0,
                                                                 exposure: Exposure::Add,
                                                             },
@@ -1095,14 +1077,14 @@ pub(crate) enum GerberPrimitive {
 
 #[derive(Debug, Clone)]
 pub(crate) struct CircleGerberPrimitive {
-    pub center: Position,
+    pub center: Point2<f64>,
     pub diameter: f64,
     pub exposure: Exposure,
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct RectangleGerberPrimitive {
-    pub origin: Position,
+    pub origin: Point2<f64>,
     pub width: f64,
     pub height: f64,
     pub exposure: Exposure,
@@ -1110,22 +1092,22 @@ pub(crate) struct RectangleGerberPrimitive {
 
 #[derive(Debug, Clone)]
 pub(crate) struct LineGerberPrimitive {
-    pub start: Position,
-    pub end: Position,
+    pub start: Point2<f64>,
+    pub end: Point2<f64>,
     pub width: f64,
     pub exposure: Exposure,
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct PolygonGerberPrimitive {
-    pub center: Position,
+    pub center: Point2<f64>,
     pub exposure: Exposure,
     pub geometry: Arc<PolygonGeometry>,
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct ArcGerberPrimitive {
-    pub center: Position,
+    pub center: Point2<f64>,
     pub radius: f64,
     pub width: f64,
     pub start_angle: f64, // in radians
@@ -1160,16 +1142,16 @@ impl ArcGerberPrimitive {
 
 #[derive(Debug, Clone)]
 pub struct PolygonGeometry {
-    pub relative_vertices: Vec<Position>,  // Relative to center
-    pub tessellation: Option<PolygonMesh>, // Precomputed tessellation data
+    pub relative_vertices: Vec<Point2<f64>>, // Relative to center
+    pub tessellation: Option<PolygonMesh>,   // Precomputed tessellation data
     pub is_convex: bool,
 }
 
 #[derive(Debug)]
 pub struct GerberPolygon {
-    center: Position,
+    center: Point2<f64>,
     /// Relative to center
-    vertices: Vec<Position>,
+    vertices: Vec<Point2<f64>>,
     exposure: Exposure,
 }
 
@@ -1239,15 +1221,15 @@ impl Default for ViewState {
 
 impl ViewState {
     /// Convert to gerber coordinates using view transformation
-    pub fn screen_to_gerber_coords(&self, screen_pos: Pos2) -> Position {
+    pub fn screen_to_gerber_coords(&self, screen_pos: Pos2) -> Point2<f64> {
         let gerber_pos = (screen_pos - self.translation) / self.scale;
-        Position::new(gerber_pos.x as f64, gerber_pos.y as f64).invert_y()
+        Point2::new(gerber_pos.x as f64, gerber_pos.y as f64).invert_y()
     }
 
     /// Convert from gerber coordinates using view transformation
-    pub fn gerber_to_screen_coords(&self, gerber_pos: Position) -> Pos2 {
+    pub fn gerber_to_screen_coords(&self, gerber_pos: Point2<f64>) -> Pos2 {
         let gerber_pos = gerber_pos.invert_y();
-        ((gerber_pos * self.scale as f64) + self.translation).to_pos2()
+        (gerber_pos * self.scale as f64).to_pos2() + self.translation
     }
 }
 
@@ -1652,8 +1634,8 @@ mod circle_aperture_tests {
         Aperture, ApertureDefinition, Circle, Command, CoordinateFormat, CoordinateNumber, Coordinates, DCode,
         ExtendedCode, FunctionCode, Operation, Unit,
     };
+    use nalgebra::Point2;
 
-    use crate::spacial::Position;
     use crate::testing::dump_gerber_source;
     use crate::types::Exposure;
     use crate::ArcGerberPrimitive;
@@ -1664,7 +1646,7 @@ mod circle_aperture_tests {
         // Given: A circle aperture with a hole
         let outer_diameter = 2.5;
         let hole_diameter = 0.5;
-        let center = Position::new(0.0, 0.0);
+        let center = Point2::new(0.0_f64, 0.0_f64);
 
         // Create an aperture definition that would be parsed from the Gerber file
         let aperture = Aperture::Circle(Circle {
@@ -1749,7 +1731,6 @@ mod bounding_box_arc_tests {
     use rstest::rstest;
 
     use super::*;
-    use crate::spacial::Position;
 
     // Helper function to create a test arc
     fn create_arc_primitive(
@@ -1761,10 +1742,7 @@ mod bounding_box_arc_tests {
         sweep_angle: f64,
     ) -> GerberPrimitive {
         GerberPrimitive::Arc(ArcGerberPrimitive {
-            center: Position {
-                x: center_x,
-                y: center_y,
-            },
+            center: Point2::new(center_x, center_y),
             radius,
             width,
             start_angle,
