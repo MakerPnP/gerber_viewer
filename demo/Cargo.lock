@@ -1319,7 +1319,7 @@ dependencies = [
 [[package]]
 name = "gerber_parser"
 version = "0.2.0"
-source = "git+https://github.com/makerpnp/gerber-parser.git?rev=c8a86362b7cf68964dedce3fb7339d7a5feb9106#c8a86362b7cf68964dedce3fb7339d7a5feb9106"
+source = "git+https://github.com/makerpnp/gerber-parser.git?rev=60897644176c060d37a7c904ab524d9d439d9cdb#60897644176c060d37a7c904ab524d9d439d9cdb"
 dependencies = [
  "anyhow",
  "gerber_types",
