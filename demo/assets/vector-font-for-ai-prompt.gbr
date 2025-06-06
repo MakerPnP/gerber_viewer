@@ -1,0 +1,39 @@
+%TF.GenerationSoftware,HUMAN,DominicClifton,8.0.3*%
+%TF.CreationDate,2025-04-28T16:25:44+02:00*%
+%TF.SameCoordinates,Original*%
+%TF.FileFunction,Copper,L4,Bot*%
+%TF.FilePolarity,Positive*%
+%FSLAX46Y46*%
+G04 Gerber Fmt 4.6, Leading zero omitted, Abs format (unit mm)*
+%MOMM*%
+%LPD*%
+G01*
+
+G04 Vector font on a 20 * 20 grid with center at (0,0), macro name format: "VECTORFONT_<ASCII-DECIMAL-CODE>"*
+%AMVECTORFONT_77*
+0 $1 = width
+0 $2 = scale
+0 $3 = rotation
+0 bottom left, go up to top left
+20,1,$1,-10x$2,-10x$2,-10x$2,10x$2,$3*
+0 top left, go down to center
+20,1,$1,-10x$2,10x$2,0x$2,-10x$2,$3*
+0 center, go up to top right
+20,1,$1,0x$2,0x$2,10x$2,10x$2,$3*
+0 top right, go down to bottom right
+20,1,$1,10x$2,-10x$2,10x$2,10x$2,$3*
+%
+
+G04 Start ASCII characters at 100 + ASCII, ASCII A = 65, thus A = 65 + 100 = 165, ASCII M = 77, thus M = 77 + 100 = 177*
+%ADD177VECTORFONT_77,0.1X0.45X0*%
+
+G04 Select 'M'*
+
+D177*
+
+G04 Write 'MMM', centered around (0,0)*
+X-10000000Y0D03*
+X00000000Y0D03*
+X10000000Y0D03*
+
+M02*

@@ -10,18 +10,18 @@ use gerber_viewer::{draw_arrow, draw_outline, draw_crosshair, BoundingBox, Gerbe
 const ENABLE_UNIQUE_SHAPE_COLORS: bool = true;
 const ENABLE_POLYGON_NUMBERING: bool = false;
 const ZOOM_FACTOR: f32 = 0.50;
-const ROTATION_SPEED_DEG_PER_SEC: f32 = 0.0;
+const ROTATION_SPEED_DEG_PER_SEC: f32 = 45.0;
 const INITIAL_ROTATION: f32 = 45.0_f32.to_radians();
 const MIRRORING: [bool; 2] = [false, false];
 
 // for mirroring and rotation
-//const CENTER_OFFSET: Vector2<f64> = Vector2::new(0.0, 0.0);
-const CENTER_OFFSET: Vector2<f64> = Vector2::new(14.75, 6.0);
+const CENTER_OFFSET: Vector2<f64> = Vector2::new(0.0, 0.0);
+//const CENTER_OFFSET: Vector2<f64> = Vector2::new(14.75, 6.0);
 
 // in EDA tools like DipTrace, a gerber offset can be specified when exporting gerbers, e.g. 10,5.
 // use negative offsets here to relocate the gerber back to 0,0, e.g. -10, -5
-//const DESIGN_OFFSET: Vector2<f64> = Vector2::new(0.0, 0.0);
-const DESIGN_OFFSET: Vector2<f64> = Vector2::new(-10.0, -10.0);
+const DESIGN_OFFSET: Vector2<f64> = Vector2::new(0.0, 0.0);
+//const DESIGN_OFFSET: Vector2<f64> = Vector2::new(-10.0, -10.0);
 
 // radius of the markers, in gerber coordinates
 const MARKER_RADIUS: f32 = 2.5;
@@ -39,6 +39,7 @@ struct DemoApp {
 impl DemoApp {
     pub fn new() -> Self {
         //let demo_str = include_str!("../assets/demo.gbr").as_bytes();
+        let demo_str = include_str!("../assets/vector-font.gbr").as_bytes();
         //let demo_str = include_str!("../assets/diptrace-outline-test-1/BoardOutline.gbr").as_bytes();
         //let demo_str = include_str!("../assets/diptrace-font-test-1/TopAssembly.gbr").as_bytes();
         //let demo_str = include_str!("../assets/rectangles.gbr").as_bytes();
@@ -48,7 +49,7 @@ impl DemoApp {
         //let demo_str = include_str!("../assets/macro-polygons-concave.gbr").as_bytes();
         //let demo_str = include_str!("../assets/macro-variables.gbr").as_bytes();
 
-        let demo_str = include_str!(r#"D:\Users\Hydra\Documents\DipTrace\Projects\SPRacingRXN1\Export\SPRacingRXN1-RevB-20240507-1510_gerberx2\TopSilk.gbr"#).as_bytes();
+        //let demo_str = include_str!(r#"D:\Users\Hydra\Documents\DipTrace\Projects\SPRacingRXN1\Export\SPRacingRXN1-RevB-20240507-1510_gerberx2\TopSilk.gbr"#).as_bytes();
 
 
         let reader = BufReader::new(demo_str);
