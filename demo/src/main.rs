@@ -40,6 +40,7 @@ impl DemoApp {
     pub fn new() -> Self {
         //let demo_str = include_str!("../assets/demo.gbr").as_bytes();
         //let demo_str = include_str!("../assets/diptrace-outline-test-1/BoardOutline.gbr").as_bytes();
+        //let demo_str = include_str!("../assets/diptrace-font-test-1/TopAssembly.gbr").as_bytes();
         //let demo_str = include_str!("../assets/rectangles.gbr").as_bytes();
         //let demo_str = include_str!("../assets/arcs.gbr").as_bytes();
         //let demo_str = include_str!("../assets/macro-vectorline.gbr").as_bytes();
@@ -224,17 +225,17 @@ impl eframe::App for DemoApp {
                 
                 // if you want to display multiple layers, call `paint_layer` for each layer. 
 
-                draw_outline(&painter, bbox_vertices_screen, Color32::RED);
-                draw_outline(&painter, outline_vertices_screen, Color32::GREEN);
+                //draw_outline(&painter, bbox_vertices_screen, Color32::RED);
+                //draw_outline(&painter, outline_vertices_screen, Color32::GREEN);
 
                 let screen_radius = MARKER_RADIUS * self.view_state.scale;
 
                 let design_offset_screen_position = self.view_state.gerber_to_screen_coords(DESIGN_OFFSET.to_position());
-                draw_arrow(&painter, design_offset_screen_position, self.ui_state.origin_screen_pos, Color32::ORANGE);
-                draw_marker(&painter, design_offset_screen_position, Color32::ORANGE, Color32::YELLOW, screen_radius);
+                //draw_arrow(&painter, design_offset_screen_position, self.ui_state.origin_screen_pos, Color32::ORANGE);
+                //draw_marker(&painter, design_offset_screen_position, Color32::ORANGE, Color32::YELLOW, screen_radius);
 
                 let design_origin_screen_position = self.view_state.gerber_to_screen_coords((CENTER_OFFSET - DESIGN_OFFSET).to_position());
-                draw_marker(&painter, design_origin_screen_position, Color32::PURPLE, Color32::MAGENTA, screen_radius);
+                //draw_marker(&painter, design_origin_screen_position, Color32::PURPLE, Color32::MAGENTA, screen_radius);
             });
         });
     }
