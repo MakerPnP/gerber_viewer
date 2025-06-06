@@ -278,6 +278,46 @@ mod tests {
     }
 
     #[test]
+    fn test_multiplication_decimal_literal_and_variable_using_x() {
+        let mut ctx = MacroContext::default();
+        ctx.put(1, 0.25).unwrap();
+
+        let expr = "10.0x$1".to_string();
+        let result = evaluate_expression(&expr, &ctx).unwrap();
+        assert_eq!(result, 2.5);
+    }
+
+    #[test]
+    fn test_multiplication_integer_literal_and_variable_using_x() {
+        let mut ctx = MacroContext::default();
+        ctx.put(1, 0.25).unwrap();
+
+        let expr = "10x$1".to_string();
+        let result = evaluate_expression(&expr, &ctx).unwrap();
+        assert_eq!(result, 2.5);
+    }
+
+    #[test]
+    fn test_multiplication_variable_and_decimal_literal_using_x() {
+        let mut ctx = MacroContext::default();
+        ctx.put(1, 10.0).unwrap();
+
+        let expr = "$1x0.25".to_string();
+        let result = evaluate_expression(&expr, &ctx).unwrap();
+        assert_eq!(result, 2.5);
+    }
+
+    #[test]
+    fn test_multiplication_variable_and_integer_literal_using_x() {
+        let mut ctx = MacroContext::default();
+        ctx.put(1, 10.0).unwrap();
+
+        let expr = "$1x25".to_string();
+        let result = evaluate_expression(&expr, &ctx).unwrap();
+        assert_eq!(result, 250.0);
+    }
+
+    #[test]
     fn test_multiplication_two_variables_using_asterix() {
         let mut ctx = MacroContext::default();
         ctx.put(1, 5.0).unwrap();
