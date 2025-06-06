@@ -5,7 +5,7 @@ use eframe::epaint::Color32;
 use egui::ViewportBuilder;
 use nalgebra::Vector2;
 use gerber_viewer::gerber_parser::parse;
-use gerber_viewer::{draw_arrow, draw_outline, draw_crosshair, BoundingBox, GerberLayer, GerberRenderer, Transform2D, ViewState, draw_marker, UiState, ToPosition, Invert, ToVector};
+use gerber_viewer::{draw_arrow, draw_outline, draw_crosshair, BoundingBox, GerberLayer, GerberRenderer, Transform2D, ViewState, draw_marker, UiState, ToPosition};
 
 const ENABLE_UNIQUE_SHAPE_COLORS: bool = true;
 const ENABLE_POLYGON_NUMBERING: bool = false;
@@ -112,12 +112,6 @@ impl DemoApp {
 
         self.view_state.scale = scale;
         self.needs_initial_view = false;
-
-        println!("scale: {}", self.view_state.scale);
-        println!("translation: {:?}", self.view_state.translation);
-        println!("bbox: {:?}", bbox);
-        println!("viewport: {:?}", viewport)
-
     }
 }
 
@@ -226,17 +220,17 @@ impl eframe::App for DemoApp {
                 
                 // if you want to display multiple layers, call `paint_layer` for each layer. 
 
-                //draw_outline(&painter, bbox_vertices_screen, Color32::RED);
-                //draw_outline(&painter, outline_vertices_screen, Color32::GREEN);
+                draw_outline(&painter, bbox_vertices_screen, Color32::RED);
+                draw_outline(&painter, outline_vertices_screen, Color32::GREEN);
 
                 let screen_radius = MARKER_RADIUS * self.view_state.scale;
 
                 let design_offset_screen_position = self.view_state.gerber_to_screen_coords(DESIGN_OFFSET.to_position());
-                //draw_arrow(&painter, design_offset_screen_position, self.ui_state.origin_screen_pos, Color32::ORANGE);
-                //draw_marker(&painter, design_offset_screen_position, Color32::ORANGE, Color32::YELLOW, screen_radius);
+                draw_arrow(&painter, design_offset_screen_position, self.ui_state.origin_screen_pos, Color32::ORANGE);
+                draw_marker(&painter, design_offset_screen_position, Color32::ORANGE, Color32::YELLOW, screen_radius);
 
                 let design_origin_screen_position = self.view_state.gerber_to_screen_coords((CENTER_OFFSET - DESIGN_OFFSET).to_position());
-                //draw_marker(&painter, design_origin_screen_position, Color32::PURPLE, Color32::MAGENTA, screen_radius);
+                draw_marker(&painter, design_origin_screen_position, Color32::PURPLE, Color32::MAGENTA, screen_radius);
             });
         });
     }
