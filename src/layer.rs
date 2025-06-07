@@ -2,9 +2,6 @@ use std::collections::{HashMap, HashSet};
 use std::ops::Add;
 use std::sync::Arc;
 
-#[cfg(feature = "egui")]
-use egui::epaint::emath::Vec2;
-use egui::Pos2;
 use gerber_types::{Circle, InterpolationMode, QuadrantMode};
 use log::{debug, error, info, trace, warn};
 use nalgebra::{Point2, Vector2};
@@ -19,7 +16,7 @@ use super::gerber_types::{
     MacroContent, MacroDecimal, Operation, VariableDefinition,
 };
 use super::spacial::deduplicate::DedupEpsilon;
-use super::{geometry, gerber_types, Invert, ToPos2};
+use super::{geometry, gerber_types};
 use crate::types::{Exposure, Winding};
 
 #[derive(Clone, Debug)]
@@ -1199,37 +1196,6 @@ impl GerberPrimitive {
         trace!("polygon: {:?}", polygon);
 
         polygon
-    }
-}
-
-#[cfg(feature = "egui")]
-#[derive(Debug, Copy, Clone)]
-pub struct ViewState {
-    pub translation: Vec2,
-    pub scale: f32,
-}
-
-#[cfg(feature = "egui")]
-impl Default for ViewState {
-    fn default() -> Self {
-        Self {
-            translation: Vec2::ZERO,
-            scale: 1.0,
-        }
-    }
-}
-
-impl ViewState {
-    /// Convert to gerber coordinates using view transformation
-    pub fn screen_to_gerber_coords(&self, screen_pos: Pos2) -> Point2<f64> {
-        let gerber_pos = (screen_pos - self.translation) / self.scale;
-        Point2::new(gerber_pos.x as f64, gerber_pos.y as f64).invert_y()
-    }
-
-    /// Convert from gerber coordinates using view transformation
-    pub fn gerber_to_screen_coords(&self, gerber_pos: Point2<f64>) -> Pos2 {
-        let gerber_pos = gerber_pos.invert_y();
-        (gerber_pos * self.scale as f64).to_pos2() + self.translation
     }
 }
 

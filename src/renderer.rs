@@ -7,8 +7,8 @@ use egui::epaint::{
 use egui::Painter;
 use nalgebra::Vector2;
 
-use crate::layer::{GerberPrimitive, ViewState};
-use crate::{color, GerberLayer, Mirroring};
+use crate::layer::GerberPrimitive;
+use crate::{color, GerberLayer, Mirroring, ViewState};
 use crate::{
     ArcGerberPrimitive, CircleGerberPrimitive, LineGerberPrimitive, PolygonGerberPrimitive, RectangleGerberPrimitive,
     Transform2D,

@@ -92,7 +92,7 @@ impl Transform2D {
         if self.mirroring.y {
             y = -y;
         }
-        
+
         // Pos 2 are in SCREEN coordinates, Positive Y = DOWN so we need to invert the rotation
         let (sin_theta, cos_theta) = (-self.rotation_radians as f64).sin_cos();
         let rotated_x = x * cos_theta - y * sin_theta;

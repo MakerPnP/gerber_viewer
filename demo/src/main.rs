@@ -1,6 +1,6 @@
 use std::io::BufReader;
 
-use eframe::emath::{Rect, Vec2};
+use eframe::emath::Rect;
 use eframe::epaint::Color32;
 use egui::ViewportBuilder;
 use nalgebra::Vector2;
@@ -71,46 +71,7 @@ impl DemoApp {
 
     fn reset_view(&mut self, viewport: Rect) {
         let bbox = self.gerber_layer.bounding_box();
-        let content_width = bbox.width();
-        let content_height = bbox.height();
-
-        // Calculate scale to fit the content (100% zoom)
-        let scale = f32::min(
-            viewport.width() / (content_width as f32),
-            viewport.height() / (content_height as f32),
-        );
-        // 50% zoom
-        let scale = scale * ZOOM_FACTOR;
-        // adjust slightly to add a margin
-        let scale = scale * 0.95;
-
-        // Create the same transform that will be used in update()
-        let origin = CENTER_OFFSET - DESIGN_OFFSET;
-        let transform = Transform2D {
-            rotation_radians: self.rotation_radians,
-            mirroring: MIRRORING.into(),
-            origin,
-            offset: DESIGN_OFFSET,
-        };
-
-        // Compute transformed bounding box
-        let outline_vertices: Vec<_> = bbox
-            .vertices()
-            .into_iter()
-            .map(|v| transform.apply_to_position(v))
-            .collect();
-
-        let transformed_bbox = BoundingBox::from_points(&outline_vertices);
-
-        // Use the center of the transformed bounding box
-        let transformed_center = transformed_bbox.center();
-
-        self.view_state.translation = Vec2::new(
-            viewport.center().x - (transformed_center.x as f32 * scale),
-            viewport.center().y + (transformed_center.y as f32 * scale),
-        );
-
-        self.view_state.scale = scale;
+        self.view_state.reset_view(viewport, bbox, ZOOM_FACTOR, CENTER_OFFSET, DESIGN_OFFSET, self.rotation_radians, MIRRORING.into());
         self.needs_initial_view = false;
     }
 }
