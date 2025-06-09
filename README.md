@@ -40,7 +40,7 @@ See `demo/src/main.rs` and `demo/Cargo.toml` for details.
 
 Screenshot:
 
-![screenshot_2025-05-27_145315.png](assets/makerpnp_gerber_viewer/screenshots/screenshot_2025-05-27_145315.png)
+![screenshot_2025-06-09_213837.png](assets/makerpnp_gerber_viewer/screenshots/screenshot_2025-06-09_213837.png)
 
 Red box = Axis aligned bounding box.
 Green box = layer bounding box.
@@ -50,7 +50,7 @@ Orange line and point = Design offset.
 Purple point = Design origin.
 Single gerber layer rendered with individual shape coloring debug mode enabled.
 
-Video:
+Video (from a slightly older version):
 ![recording_2025-05-27_145242.gif](assets/makerpnp_gerber_viewer/screenshots/recording_2025-05-27_145242.gif)
 
 
