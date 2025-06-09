@@ -1,0 +1,45 @@
+%TF.GenerationSoftware,HUMAN,DominicClifton,8.0.3*%
+%TF.CreationDate,2025-04-28T16:25:44+02:00*%
+%TF.SameCoordinates,Original*%
+%TF.FileFunction,Copper,L4,Bot*%
+%TF.FilePolarity,Positive*%
+%FSLAX46Y46*%
+G04 Gerber Fmt 4.6, Leading zero omitted, Abs format (unit mm)*
+%MOMM*%
+%LPD*%
+G01*
+
+%AMRoundRect*
+0 Rectangle with rounded corners*
+0 $1 Rounding radius*
+0 $2 $3 $4 $5 $6 $7 $8 $9 X,Y pos of 4 corners*
+0 $10 Rotation (degrees)*
+0 Add a 4 corners polygon primitive as box body*
+4,1,4,$2,$3,$4,$5,$6,$7,$8,$9,$2,$3,$10*
+0 Add four circle primitives for the rounded corners*
+1,1,$1+$1,$2,$3,$10*
+1,1,$1+$1,$4,$5,$10*
+1,1,$1+$1,$6,$7,$10*
+1,1,$1+$1,$8,$9,$10*
+0 Add four vector-line primitives between the rounded corners*
+20,1,$1+$1,$2,$3,$4,$5,$10*
+20,1,$1+$1,$4,$5,$6,$7,$10*
+20,1,$1+$1,$6,$7,$8,$9,$10*
+20,1,$1+$1,$8,$9,$2,$3,$10*
+%
+
+%ADD34RoundRect,0.500000X-2.500000X-2.500000X2.500000X-2.500000X2.500000X2.500000X-2.500000X2.500000X0*%
+%ADD35RoundRect,0.500000X-2.500000X-2.500000X2.500000X-2.500000X2.500000X2.500000X-2.500000X2.500000X45*%
+%ADD36RoundRect,0.500000X-2.500000X-2.500000X2.500000X-2.500000X2.500000X2.500000X-2.500000X2.500000X90*%
+%ADD37RoundRect,0.500000X-2.500000X-2.500000X2.500000X-2.500000X2.500000X2.500000X-2.500000X2.500000X135*%
+
+D34*
+X005000000Y005000000D03*
+D35*
+X-005000000Y005000000D03*
+D36*
+X-005000000Y-005000000D03*
+D37*
+X005000000Y-005000000D03*
+
+M02*

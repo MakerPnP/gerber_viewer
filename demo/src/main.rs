@@ -47,6 +47,7 @@ impl DemoApp {
         //let demo_str = include_str!("../assets/arcs.gbr").as_bytes();
         //let demo_str = include_str!("../assets/macro-centerline.gbr").as_bytes();
         //let demo_str = include_str!("../assets/macro-vectorline.gbr").as_bytes();
+        //let demo_str = include_str!("../assets/macro-rounded-rectangle.gbr").as_bytes();
         //let demo_str = include_str!("../assets/macro-polygons.gbr").as_bytes();
         //let demo_str = include_str!("../assets/macro-polygons-concave.gbr").as_bytes();
 

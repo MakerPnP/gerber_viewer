@@ -9,8 +9,8 @@ G04 Gerber Fmt 4.6, Leading zero omitted, Abs format (unit mm)*
 %LPD*%
 G01*
 G04 Rectangle outline with rounded corners*
-%ADD60C,0.1*%
-D60*
+%ADD79C,0.1*%
+D79*
 G01*
 G75*
 X20000000Y-30000000D02*
@@ -32,8 +32,8 @@ X20000000Y-30000000I-10000000J0D01*
 G04 End of rounded rectangle outline*
 
 G04 obround outlines*
-%ADD61C,0.2*%
-D61*
+%ADD80C,0.2*%
+D80*
 G01*
 G75*
 X-22500000Y10000000D02*
@@ -57,10 +57,11 @@ X22500000Y10000000D01*
 G04 End of obround outlines*
 
 G04 a circle made of a 360 degree arc.*
-%ADD62C,0.25*%
-D62*
+%ADD81C,0.25*%
+D81*
 G75*
 X15000000Y0D02*
 G03*
 X15000000Y0I-15000000J0D01*
+
 M02*
