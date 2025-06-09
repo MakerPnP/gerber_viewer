@@ -15,7 +15,7 @@ gerber_types = { git = "https://github.com/MakerPnP/gerber-types.git", rev = "76
 #gerber_types = { path = "../gerber-types" }
 
 # Gerber parser (optional, see README.md)
-gerber_parser = { git = "https://github.com/makerpnp/gerber-parser.git", rev = "60897644176c060d37a7c904ab524d9d439d9cdb", optional = true }
+gerber_parser = { git = "https://github.com/makerpnp/gerber-parser.git", rev = "01357056bd39781da9ee9a1177143a0976c368ef", optional = true }
 #gerber_parser = { path = "../gerber-parser", optional = true }
 
 # Math
