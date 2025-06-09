@@ -16,7 +16,7 @@ G01*
 0 Add two vector-line primitives between the rounded corners*
 20,1,$1,$3-$2,$4,$3+$2,$4,0*
 20,1,$1,$3,$4-$2,$3,$4+$2,0*%
-%ADD40VectorPlus,X0.500000X1.000000X0.000000X0.000000*%
+%ADD40VectorPlus,0.500000X1.000000X0.000000X0.000000*%
 D40*
 X015000000Y015000000D03*
 X-015000000Y015000000D03*

@@ -44,10 +44,10 @@ impl DemoApp {
         //let demo_str = include_str!("../assets/diptrace-font-test-1/TopAssembly.gbr").as_bytes();
         //let demo_str = include_str!("../assets/rectangles.gbr").as_bytes();
         //let demo_str = include_str!("../assets/arcs.gbr").as_bytes();
+        //let demo_str = include_str!("../assets/macro-centerline.gbr").as_bytes();
         //let demo_str = include_str!("../assets/macro-vectorline.gbr").as_bytes();
         //let demo_str = include_str!("../assets/macro-polygons.gbr").as_bytes();
         //let demo_str = include_str!("../assets/macro-polygons-concave.gbr").as_bytes();
-        //let demo_str = include_str!("../assets/macro-variables.gbr").as_bytes();
 
         //let demo_str = include_str!(r#"D:\Users\Hydra\Documents\DipTrace\Projects\SPRacingRXN1\Export\SPRacingRXN1-RevB-20240507-1510_gerberx2\TopSilk.gbr"#).as_bytes();
 
