@@ -8,7 +8,8 @@ use gerber_viewer::gerber_parser::parse;
 use gerber_viewer::{draw_arrow, draw_outline, draw_crosshair, BoundingBox, GerberLayer, GerberRenderer, Transform2D, ViewState, draw_marker, UiState, ToPosition};
 
 const ENABLE_UNIQUE_SHAPE_COLORS: bool = true;
-const ENABLE_POLYGON_NUMBERING: bool = false;
+const ENABLE_VERTEX_NUMBERING: bool = false;
+const ENABLE_SHAPE_NUMBERING: bool = false;
 const ZOOM_FACTOR: f32 = 0.50;
 const ROTATION_SPEED_DEG_PER_SEC: f32 = 45.0;
 const INITIAL_ROTATION: f32 = 45.0_f32.to_radians();
@@ -172,7 +173,8 @@ impl eframe::App for DemoApp {
                     &self.gerber_layer,
                     Color32::WHITE,
                     ENABLE_UNIQUE_SHAPE_COLORS,
-                    ENABLE_POLYGON_NUMBERING,
+                    ENABLE_SHAPE_NUMBERING,
+                    ENABLE_VERTEX_NUMBERING,
                     self.rotation_radians,
                     MIRRORING.into(),
                     CENTER_OFFSET.into(),
