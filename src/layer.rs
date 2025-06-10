@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::ops::Add;
 use std::sync::Arc;
 
-use gerber_types::{Circle, InterpolationMode, QuadrantMode};
+use gerber_types::{Circle, InterpolationMode, QuadrantMode, StepAndRepeat};
 use log::{debug, error, info, trace, warn};
 use nalgebra::{Point2, Vector2};
 
@@ -198,7 +198,7 @@ impl WithBoundingBox for PolygonGerberPrimitive {
 }
 
 impl GerberLayer {
-    fn update_position(current_pos: &mut Point2<f64>, coords: &Coordinates) {
+    fn update_position(current_pos: &mut Point2<f64>, coords: &Coordinates, offset: Vector2<f64>) {
         let (x, y) = (
             coords
                 .x
@@ -210,7 +210,7 @@ impl GerberLayer {
                 .unwrap_or(current_pos.y),
         );
 
-        *current_pos = Point2::new(x, y);
+        *current_pos = Point2::new(x, y) + offset;
     }
 
     fn calculate_bounding_box(primitives: &Vec<GerberPrimitive>) -> BoundingBox {
@@ -233,6 +233,20 @@ impl GerberLayer {
     }
 
     fn build_primitives(commands: &[Command]) -> Vec<GerberPrimitive> {
+        #[derive(Debug)]
+        struct StepRepeatState {
+            initial_position: Point2<f64>,
+            start_index: usize,
+
+            repeat_x: u32,
+            repeat_y: u32,
+            distance_x: f64,
+            distance_y: f64,
+
+            x_index: u32,
+            y_index: u32,
+        }
+
         let mut macro_definitions: HashMap<String, &ApertureMacro> = HashMap::default();
 
         // First pass: collect aperture macros
@@ -618,7 +632,7 @@ impl GerberLayer {
         debug!("aperture codes: {:?}", apertures.keys());
         info!("apertures: {:?}", apertures.len());
 
-        // Third pass: collect all primitives, handle regions
+        // Third pass: collect all primitives, handle regions and step-repeat blocks
 
         let mut layer_primitives = Vec::new();
         let mut current_aperture = None;
@@ -634,8 +648,83 @@ impl GerberLayer {
         let mut current_region_vertices: Vec<Point2<f64>> = Vec::new();
         let mut in_region = false;
 
-        for cmd in commands.iter() {
+        let mut index = 0;
+
+        // set to some when the first step-repeat block is encountered
+        let mut step_repeat_state: Option<StepRepeatState> = None;
+        // not using an option here to keep the math simple
+        let mut step_repeat_offset: Vector2<f64> = Vector2::new(0.0, 0.0);
+
+        loop {
+            let Some(cmd) = commands.get(index) else { break };
+
             match cmd {
+                Command::ExtendedCode(ExtendedCode::StepAndRepeat(StepAndRepeat::Open {
+                    repeat_x,
+                    repeat_y,
+                    distance_x,
+                    distance_y,
+                })) => {
+                    if step_repeat_state.is_some() {
+                        error!("Step repeat open without matching close");
+                    } else {
+                        let state = StepRepeatState {
+                            initial_position: current_pos,
+                            repeat_x: *repeat_x,
+                            repeat_y: *repeat_y,
+                            distance_x: *distance_x,
+                            distance_y: *distance_y,
+                            start_index: index + 1,
+                            x_index: 0,
+                            y_index: 0,
+                        };
+                        trace!("Step-and-repeat open, state: {:?}", state);
+                        step_repeat_state = Some(state);
+                    }
+                }
+                Command::ExtendedCode(ExtendedCode::StepAndRepeat(StepAndRepeat::Close)) => {
+                    if let Some(state) = &mut step_repeat_state {
+                        let mut complete = false;
+                        state.y_index += 1;
+                        if state.y_index >= state.repeat_y {
+                            state.y_index = 0;
+
+                            state.x_index += 1;
+                            if state.x_index >= state.repeat_x {
+                                complete = true;
+                            }
+                        }
+
+                        // The gerber spec says "The current point is undefined after an SR statement."
+                        // but let's be consistent by resetting the position to the position when the
+                        // block we started, for commands AFTER the step-repeat and for commands
+                        // in the next step-repeat iteration.
+                        // We could just not do this, which might be more 'compliant', but inconsistent.
+                        current_pos = state.initial_position;
+
+                        if complete {
+                            trace!("Step-and-repeat close");
+                            step_repeat_offset = Vector2::new(0.0, 0.0);
+                            step_repeat_state = None;
+                        } else {
+                            step_repeat_offset = Vector2::new(
+                                state.distance_x * state.x_index as f64,
+                                state.distance_y * state.y_index as f64,
+                            );
+
+                            trace!(
+                                "Step-and-repeat continue, state: {:?}, current_position: {:?}",
+                                state,
+                                current_pos
+                            );
+
+                            index = state.start_index;
+                            continue;
+                        }
+                    } else {
+                        error!("Step repeat close without matching open");
+                    }
+                }
                 Command::FunctionCode(FunctionCode::GCode(GCode::InterpolationMode(mode))) => {
                     interpolation_mode = *mode;
                 }
@@ -711,7 +800,7 @@ impl GerberLayer {
                     match operation {
                         Operation::Move(coords) => {
                             let mut end = current_pos;
-                            Self::update_position(&mut end, coords);
+                            Self::update_position(&mut end, coords, step_repeat_offset);
                             if in_region {
                                 // In a region, a move operation starts a new path segment
                                 // If we already have vertices, close the current segment
@@ -725,7 +814,7 @@ impl GerberLayer {
                         }
                         Operation::Interpolate(coords, offset) => {
                             let mut end = current_pos;
-                            Self::update_position(&mut end, coords);
+                            Self::update_position(&mut end, coords, step_repeat_offset);
                             if in_region {
                                 // Add vertex to current region
                                 current_region_vertices.push(end);
@@ -850,7 +939,7 @@ impl GerberLayer {
                             if in_region {
                                 warn!("Flash operation found within region - ignoring");
                             } else {
-                                Self::update_position(&mut current_pos, coords);
+                                Self::update_position(&mut current_pos, coords, step_repeat_offset);
 
                                 if let Some(aperture) = current_aperture {
                                     match aperture {
@@ -1041,6 +1130,8 @@ impl GerberLayer {
                 }
                 _ => {}
             }
+
+            index += 1;
         }
 
         if aperture_selection_errors.len() > 0 {
