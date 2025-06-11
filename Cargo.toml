@@ -11,11 +11,11 @@ egui = { version = "0.31.1", optional = true }
 # Gerber files
 # currently un-released, using latest gerber_types with updates to support macro expressions
 #gerber_types = "0.4.0"
-gerber_types = { git = "https://github.com/MakerPnP/gerber-types.git", rev = "e5b037155964d94526993c38675ba1b191987fa9"}
+gerber_types = { git = "https://github.com/MakerPnP/gerber-types.git", rev = "aeac3cec5a2401fbaf2e6651a74888de4a7e2c0b"}
 #gerber_types = { path = "../gerber-types" }
 
 # Gerber parser (optional, see README.md)
-gerber_parser = { git = "https://github.com/makerpnp/gerber-parser.git", rev = "72b27bc2669488305d014551f24186a654d3ceb4", optional = true }
+gerber_parser = { git = "https://github.com/makerpnp/gerber-parser.git", rev = "5fa8ede637a833a520640fbf09831ab126e23c86", optional = true }
 #gerber_parser = { path = "../gerber-parser", optional = true }
 
 # Math
