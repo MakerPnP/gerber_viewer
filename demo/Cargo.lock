@@ -1319,7 +1319,7 @@ dependencies = [
 [[package]]
 name = "gerber_parser"
 version = "0.2.0"
-source = "git+https://github.com/makerpnp/gerber-parser.git?rev=3b9a8568f2d4b205fcb779e4af3d9df11bbea722#3b9a8568f2d4b205fcb779e4af3d9df11bbea722"
+source = "git+https://github.com/makerpnp/gerber-parser.git?rev=72b27bc2669488305d014551f24186a654d3ceb4#72b27bc2669488305d014551f24186a654d3ceb4"
 dependencies = [
  "anyhow",
  "gerber_types",
@@ -1332,7 +1332,7 @@ dependencies = [
 [[package]]
 name = "gerber_types"
 version = "0.4.0"
-source = "git+https://github.com/MakerPnP/gerber-types.git?rev=aec4532858590c5e2f8ba2b114998adfa54f7e7b#aec4532858590c5e2f8ba2b114998adfa54f7e7b"
+source = "git+https://github.com/MakerPnP/gerber-types.git?rev=e5b037155964d94526993c38675ba1b191987fa9#e5b037155964d94526993c38675ba1b191987fa9"
 dependencies = [
  "chrono",
  "num-rational",
