@@ -96,7 +96,6 @@ impl WithBoundingBox for ArcGerberPrimitive {
         let points = self.generate_points();
         let mut bbox = BoundingBox::default();
 
-        println!("points: {:?}", points);
         for point in points {
             // TODO this could be improved by using a tangent of the arc at each point and
             //      using a vector, of length `half_width`, pointing away from the arc origin, to calculate the
