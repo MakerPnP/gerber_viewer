@@ -163,10 +163,6 @@ impl<'a> Parser<'a> {
         loop {
             self.eat_whitespace();
             match self.peek() {
-                Some('*') => {
-                    self.bump();
-                    value *= self.parse_factor()?;
-                }
                 Some('/') => {
                     self.bump();
                     value /= self.parse_factor()?;
@@ -315,17 +311,6 @@ mod tests {
         let expr = "$1x25".to_string();
         let result = evaluate_expression(&expr, &ctx).unwrap();
         assert_eq!(result, 250.0);
-    }
-
-    #[test]
-    fn test_multiplication_two_variables_using_asterix() {
-        let mut ctx = MacroContext::default();
-        ctx.put(1, 5.0).unwrap();
-        ctx.put(2, 2.0).unwrap();
-
-        let expr = "$1*$2".to_string();
-        let result = evaluate_expression(&expr, &ctx).unwrap();
-        assert_eq!(result, 10.0);
     }
 
     #[test]
