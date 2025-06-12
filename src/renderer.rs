@@ -150,7 +150,13 @@ impl Renderable for CircleGerberPrimitive {
         #[cfg(feature = "egui")]
         painter.circle(center, radius, color, Stroke::NONE);
 
-        draw_shape_number(painter, view, transform, screen_center, shape_number);
+        draw_shape_number(
+            painter,
+            view,
+            transform,
+            ShapeNumberPosition::Transformed(center),
+            shape_number,
+        );
     }
 }
 
@@ -180,6 +186,7 @@ impl Renderable for RectangleGerberPrimitive {
             origin.x as f32 + *width as f32 / 2.0,     // Add half width to get center
             -(origin.y as f32 + *height as f32 / 2.0), // Flip Y and add half height
         );
+        let center = (view.translation + transform.apply_to_pos2(screen_center) * view.scale).to_pos2();
 
         let angle_normalized = rotation.to_degrees().rem_euclid(360.0);
         let is_axis_aligned = (angle_normalized - 0.0).abs() < f32::EPSILON
@@ -197,7 +204,6 @@ impl Renderable for RectangleGerberPrimitive {
                 std::mem::swap(&mut width, &mut height);
             }
 
-            let center = (view.translation + transform.apply_to_pos2(screen_center) * view.scale).to_pos2();
             let size = Vec2::new(width, height) * view.scale;
             let top_left = center - size / 2.0; // Calculate top-left from center
 
@@ -232,7 +238,13 @@ impl Renderable for RectangleGerberPrimitive {
             painter.add(Shape::convex_polygon(screen_corners, color, Stroke::NONE));
         }
 
-        draw_shape_number(painter, view, transform, screen_center, shape_number);
+        draw_shape_number(
+            painter,
+            view,
+            transform,
+            ShapeNumberPosition::Transformed(center),
+            shape_number,
+        );
     }
 }
 
@@ -259,21 +271,29 @@ impl Renderable for LineGerberPrimitive {
         let start_position = Pos2::new(start.x as f32, -(start.y as f32));
         let end_position = Pos2::new(end.x as f32, -(end.y as f32));
 
-        let start_position = view.translation + transform.apply_to_pos2(start_position) * view.scale;
-        let end_position = view.translation + transform.apply_to_pos2(end_position) * view.scale;
+        let transformed_start_position =
+            (view.translation + transform.apply_to_pos2(start_position) * view.scale).to_pos2();
+        let transformed_end_position =
+            (view.translation + transform.apply_to_pos2(end_position) * view.scale).to_pos2();
 
         painter.line_segment(
-            [start_position.to_pos2(), end_position.to_pos2()],
+            [transformed_start_position, transformed_end_position],
             Stroke::new((*width as f32) * view.scale, color),
         );
         // Draw circles at either end of the line.
         let radius = (*width as f32 / 2.0) * view.scale;
-        painter.circle(start_position.to_pos2(), radius, color, Stroke::NONE);
-        painter.circle(end_position.to_pos2(), radius, color, Stroke::NONE);
+        painter.circle(transformed_start_position, radius, color, Stroke::NONE);
+        painter.circle(transformed_end_position, radius, color, Stroke::NONE);
 
         if shape_number.is_some() {
-            let screen_center = (start_position + end_position) / 2.0;
-            draw_shape_number(painter, view, transform, screen_center.to_pos2(), shape_number);
+            let screen_center = (transformed_start_position + transformed_end_position.to_vec2()) / 2.0;
+            draw_shape_number(
+                painter,
+                view,
+                transform,
+                ShapeNumberPosition::Transformed(screen_center),
+                shape_number,
+            );
         }
     }
 }
@@ -335,6 +355,8 @@ impl Renderable for ArcGerberPrimitive {
             points.push(position);
         }
 
+        let center_point = points[steps / 2];
+
         // Ensure exact closure for full circles
         if is_full_circle {
             points[steps - 1] = points[0];
@@ -351,7 +373,15 @@ impl Renderable for ArcGerberPrimitive {
             },
         }));
 
-        draw_shape_number(painter, view, transform, screen_center, shape_number);
+        // draw the shape number at the center of the arc, not at the origin of the arc, which for arcs with a
+        // large radius but small sweep could be way off the screen.
+        draw_shape_number(
+            painter,
+            view,
+            transform,
+            ShapeNumberPosition::Transformed(center_point),
+            shape_number,
+        );
     }
 }
 
@@ -437,7 +467,13 @@ impl Renderable for PolygonGerberPrimitive {
             }
         }
 
-        draw_shape_number(painter, view, transform, screen_center, shape_number);
+        draw_shape_number(
+            painter,
+            view,
+            transform,
+            ShapeNumberPosition::Untransformed(screen_center),
+            shape_number,
+        );
     }
 }
 
@@ -445,12 +481,17 @@ fn draw_shape_number(
     painter: &Painter,
     view: &ViewState,
     transform: &Transform2D,
-    screen_center: Pos2,
+    position: ShapeNumberPosition,
     shape_number: Option<usize>,
 ) {
     let Some(shape_number) = shape_number else { return };
 
-    let position = (view.translation + transform.apply_to_pos2(screen_center) * view.scale).to_pos2();
+    let position = match position {
+        ShapeNumberPosition::Transformed(position) => position,
+        ShapeNumberPosition::Untransformed(position) => {
+            (view.translation + transform.apply_to_pos2(position) * view.scale).to_pos2()
+        }
+    };
     painter.text(
         position,
         Align2::CENTER_CENTER,
@@ -458,4 +499,9 @@ fn draw_shape_number(
         FontId::monospace(16.0),
         Color32::GREEN,
     );
+}
+
+enum ShapeNumberPosition {
+    Transformed(Pos2),
+    Untransformed(Pos2),
 }
