@@ -16,8 +16,11 @@ use super::gerber_types::{
     MacroContent, MacroDecimal, Operation, VariableDefinition,
 };
 use super::spacial::deduplicate::DedupEpsilon;
-use super::{geometry, gerber_types};
+use super::{geometry, gerber_types, ToVector};
 use crate::types::{Exposure, Winding};
+
+/// FUTURE if the rendering is always real-time, then caching the points at the time the primitives are created would have
+///        a performance benefit. e.g. `GerberArcPrimitive::generate_points` and similar methods.
 
 #[derive(Clone, Debug)]
 pub struct GerberLayer {
@@ -85,52 +88,30 @@ impl WithBoundingBox for ArcGerberPrimitive {
     fn bounding_box(&self) -> BoundingBox {
         let Self {
             center,
-            radius,
             width,
-            start_angle,
-            sweep_angle,
             ..
         } = self;
         let half_width = width / 2.0;
 
-        // Special case: if sweep_angle is 0 or very close to 0, treat as a full circle
-        // This handles the Gerber convention where identical start and end points indicate a full circle
-        let actual_sweep_angle = if self.is_full_circle() {
-            2.0 * std::f64::consts::PI
-        } else {
-            *sweep_angle
-        };
+        let points = self.generate_points();
+        let mut bbox = BoundingBox::default();
 
-        // Sample points along the arc to find extremes
-        let steps = 32;
+        println!("points: {:?}", points);
+        for point in points {
+            // TODO this could be improved by using a tangent of the arc at each point and
+            //      using a vector, of length `half_width`, pointing away from the arc origin, to calculate the
+            //      real outer point.
 
-        // For negative sweep, we need to adjust our approach
-        let abs_sweep = actual_sweep_angle.abs();
-        let angle_step = abs_sweep / (steps - 1) as f64;
-
-        // Always include center point in bounding box for arcs
-        let mut bbox = BoundingBox {
-            min: Point2::new(center.x, center.y),
-            max: Point2::new(center.x, center.y),
-        };
-
-        // Sample all points including the first one
-        for i in 0..steps {
-            // For negative sweep, we need to go in the other direction
-            let angle = if actual_sweep_angle >= 0.0 {
-                start_angle + angle_step * i as f64
-            } else {
-                start_angle - angle_step * i as f64
-            };
-
-            let x = center.x + radius * angle.cos();
-            let y = center.y + radius * angle.sin();
-
-            // Update bounding box with stroke width
+            let center_point = center + point.to_vector();
+            let (x, y) = (center_point.x, center_point.y);
+            // Use an axis aligned SQUARE of the stroke width at the point to calculate the bounding box
+            // For now this approximation is sufficient for current purposes.
             let stroke_bbox = BoundingBox {
                 min: Point2::new(x - half_width, y - half_width),
                 max: Point2::new(x + half_width, y + half_width),
             };
+
+            // Update bounding box using the stroke bbox
             bbox.expand(&stroke_bbox);
         }
 
@@ -907,24 +888,26 @@ impl GerberLayer {
                                                 exposure: Exposure::Add,
                                             };
 
-                                            let is_full_circle = arc_primitive.is_full_circle();
+                                            if arc_primitive.is_full_circle() {
+                                                // add the arc primitive
+                                                layer_primitives.push(GerberPrimitive::Arc(arc_primitive));
+                                            } else {
+                                                let points = arc_primitive.generate_points();
 
-                                            if !is_full_circle {
                                                 // draw a circle primitive at the start
+                                                let start_point = points.first().unwrap();
                                                 layer_primitives.push(GerberPrimitive::Circle(CircleGerberPrimitive {
-                                                    center: current_pos,
+                                                    center: start_point + center.to_vector(),
                                                     diameter: current_aperture_width,
                                                     exposure: Exposure::Add,
                                                 }));
-                                            }
 
-                                            // add the arc primitive
-                                            layer_primitives.push(GerberPrimitive::Arc(arc_primitive));
+                                                layer_primitives.push(GerberPrimitive::Arc(arc_primitive));
 
-                                            if !is_full_circle {
                                                 // draw a circle primitive at the end
+                                                let end_point = points.last().unwrap();
                                                 layer_primitives.push(GerberPrimitive::Circle(CircleGerberPrimitive {
-                                                    center: end,
+                                                    center: end_point + center.to_vector(),
                                                     diameter: current_aperture_width,
                                                     exposure: Exposure::Add,
                                                 }));
@@ -1225,6 +1208,53 @@ impl ArcGerberPrimitive {
         }
 
         false
+    }
+
+    pub fn generate_points(&self) -> Vec<Point2<f64>> {
+        let Self {
+            radius,
+            start_angle,
+            sweep_angle,
+            ..
+        } = self;
+
+        // Check if this is a full circle
+        let is_full_circle = self.is_full_circle();
+
+        let steps = if is_full_circle { 33 } else { 32 };
+
+        let effective_sweep = if is_full_circle {
+            2.0 * std::f64::consts::PI
+        } else {
+            *sweep_angle
+        };
+
+        // Calculate the absolute sweep for determining the step size
+        let abs_sweep = effective_sweep.abs();
+        let angle_step = abs_sweep / (steps - 1) as f64;
+
+        // Generate points along the outer radius
+        let mut points = Vec::with_capacity(steps);
+        for i in 0..steps {
+            // Adjust the angle based on sweep direction
+            let angle = if effective_sweep >= 0.0 {
+                start_angle + angle_step * i as f64
+            } else {
+                start_angle - angle_step * i as f64
+            };
+
+            let x = *radius * angle.cos();
+            let y = *radius * angle.sin();
+
+            points.push(Point2::new(x, y));
+        }
+
+        // Ensure exact closure for full circles
+        if is_full_circle {
+            points[steps - 1] = points[0];
+        }
+
+        points
     }
 }
 
@@ -1808,15 +1838,44 @@ mod bounding_box_arc_tests {
         })
     }
 
-    // Test for full circles
+    // This test is more result-orientated, requires no use of sin/cos/tan/PI/etc.
+    #[test]
+    pub fn test_full_circle() {
+        // given
+        let arc_primitive = ArcGerberPrimitive {
+            center: Default::default(),
+            radius: 100.0,
+            width: 1.0,
+            start_angle: 0.0_f64.to_radians(),
+            sweep_angle: 0.0_f64.to_radians(),
+            exposure: Exposure::Add,
+        };
+
+        // when
+        let bbox = arc_primitive.bounding_box();
+
+        // then
+        println!("bbox: {:?}", bbox);
+        // should be the same with as the diameter of the circle + half of the stroke width.
+        assert_eq!(bbox.min, Point2::new(-100.5, -100.5));
+        assert_eq!(bbox.max, Point2::new(100.5, 100.5));
+    }
+
+    // Test for full circles (behavior orientated)
     #[rstest]
-    #[case(0.0, 0.0)] // start = 0, sweep = 0 (special case for full circle)
-    #[case(0.0, 2.0 * PI)] // start = 0, sweep = 2π
-    fn test_full_circle_bounds(#[case] start_angle: f64, #[case] sweep_angle: f64) {
+    #[case(0.0, 0.0, 100.0, 0.0, 0.0)] // start = 0, sweep = 0 (special case for full circle)
+    #[case(0.0, 0.0, 100.0, 0.0, 2.0 * PI)] // start = 0, sweep = 2π
+    #[case(10.0, 5.0, 100.0, 0.0, 0.0)] // start = 0, sweep = 0 (special case for full circle)
+    #[case(10.0, 5.0, 100.0, 0.0, 2.0 * PI)] // start = 0, sweep = 2π
+    fn test_full_circle_bounds(
+        #[case] center_y: f64,
+        #[case] center_x: f64,
+        #[case] radius: f64,
+        #[case] start_angle: f64,
+        #[case] sweep_angle: f64,
+    ) {
         // Setup
-        let center_x = 10.0;
-        let center_y = 5.0;
-        let radius = 20.0;
+
         let width = 0.5;
 
         let arc = create_arc_primitive(center_x, center_y, radius, width, start_angle, sweep_angle);
@@ -1854,6 +1913,34 @@ mod bounding_box_arc_tests {
         );
     }
 
+    // bbox should be the same as the stroke width, centered on the center
+    #[rstest]
+    #[case(0.0, 0.0, BoundingBox { min: Point2::new(-0.5, -0.5), max: Point2::new(0.5, 0.5)})]
+    #[case(10.0, 10.0, BoundingBox { min: Point2::new(9.5, 9.5), max: Point2::new(10.5, 10.5)})]
+    pub fn test_full_circle_zero_radius(
+        #[case] center_y: f64,
+        #[case] center_x: f64,
+        #[case] expected_bbox: BoundingBox,
+    ) {
+        // given
+        let arc_primitive = ArcGerberPrimitive {
+            center: Point2::new(center_x, center_y),
+            radius: 0.0,
+            width: 1.0,
+            start_angle: 0.0_f64.to_radians(),
+            sweep_angle: 0.0_f64.to_radians(),
+            exposure: Exposure::Add,
+        };
+
+        // when
+        let bbox = arc_primitive.bounding_box();
+
+        // then
+        println!("bbox: {:?}, expected: {:?}", bbox, expected_bbox);
+        assert_eq!(bbox.min, expected_bbox.min);
+        assert_eq!(bbox.max, expected_bbox.max);
+    }
+
     // Test for partial arcs
     #[rstest]
     #[case(0.0, FRAC_PI_2)] // 0° to 90°
@@ -1877,12 +1964,6 @@ mod bounding_box_arc_tests {
         let half_width = width / 2.0;
         let total_radius = radius + half_width;
 
-        // The bounds should contain the center point
-        assert!(bbox.min.x <= center_x);
-        assert!(bbox.min.y <= center_y);
-        assert!(bbox.max.x >= center_x);
-        assert!(bbox.max.y >= center_y);
-
         // The bounds shouldn't exceed center +/- (radius + half_width) in any direction
         assert!(bbox.min.x >= center_x - total_radius - 0.1);
         assert!(bbox.min.y >= center_y - total_radius - 0.1);
@@ -1904,6 +1985,12 @@ mod bounding_box_arc_tests {
         assert!(bbox.min.y <= end_y + 0.1);
         assert!(bbox.max.x >= end_x - 0.1);
         assert!(bbox.max.y >= end_y - 0.1);
+
+        // The bounds should contain the center point, but only because they would naturally
+        assert!(bbox.min.x <= center_x);
+        assert!(bbox.min.y <= center_y);
+        assert!(bbox.max.x >= center_x);
+        assert!(bbox.max.y >= center_y);
     }
 
     // Test for negative sweeps (clockwise arcs)
@@ -1927,12 +2014,6 @@ mod bounding_box_arc_tests {
         // Same verification as for positive sweeps
         let half_width = width / 2.0;
         let total_radius = radius + half_width;
-
-        // The bounds should contain the center point
-        assert!(bbox.min.x <= center_x);
-        assert!(bbox.min.y <= center_y);
-        assert!(bbox.max.x >= center_x);
-        assert!(bbox.max.y >= center_y);
 
         // The bounds shouldn't exceed center +/- (radius + half_width) in any direction
         assert!(bbox.min.x >= center_x - total_radius - 0.1);

@@ -312,59 +312,31 @@ impl Renderable for ArcGerberPrimitive {
     ) {
         let Self {
             center,
-            radius,
             width,
-            start_angle,
-            sweep_angle,
             exposure,
+            ..
         } = self;
         let color = exposure.to_color(&color);
         let screen_center = Pos2::new(center.x as f32, -(center.y as f32));
 
-        // Check if this is a full circle
-        let is_full_circle = self.is_full_circle();
+        let points = self
+            .generate_points()
+            .iter()
+            .map(|p| {
+                let local = Vec2::new(p.x as f32, -p.y as f32);
+                let position =
+                    (view.translation + transform.apply_to_pos2(screen_center + local) * view.scale).to_pos2();
+                position
+            })
+            .collect::<Vec<_>>();
 
-        let steps = if is_full_circle { 33 } else { 32 };
-        let mut points = Vec::with_capacity(steps);
-
-        let effective_sweep = if is_full_circle {
-            2.0 * std::f64::consts::PI
-        } else {
-            *sweep_angle
-        };
-
-        // Calculate the absolute sweep for determining the step size
-        let abs_sweep = effective_sweep.abs();
-        let angle_step = abs_sweep / (steps - 1) as f64;
-
-        // Generate points along the outer radius
-        for i in 0..steps {
-            // Adjust the angle based on sweep direction
-            let angle = if effective_sweep >= 0.0 {
-                start_angle + angle_step * i as f64
-            } else {
-                start_angle - angle_step * i as f64
-            };
-
-            let x = *radius * angle.cos();
-            let y = *radius * angle.sin();
-
-            let local = Vec2::new(x as f32, -y as f32);
-            let position = (view.translation + transform.apply_to_pos2(screen_center + local) * view.scale).to_pos2();
-
-            points.push(position);
-        }
+        let steps = points.len();
 
         let center_point = points[steps / 2];
 
-        // Ensure exact closure for full circles
-        if is_full_circle {
-            points[steps - 1] = points[0];
-        }
-
         painter.add(Shape::Path(PathShape {
             points,
-            closed: is_full_circle,
+            closed: self.is_full_circle(),
             fill: Color32::TRANSPARENT,
             stroke: PathStroke {
                 width: *width as f32 * view.scale,
