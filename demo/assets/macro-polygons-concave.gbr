@@ -10,11 +10,11 @@ G04 Gerber Fmt 4.6, Leading zero omitted, Abs format (unit mm)*
 G01*
 
 %AMSTAR5*
-0 Parametric 5-point star outline using diameter
-0 $1 = outer diameter (from params)
-0 $2 = rotation degrees (from params)
-0 $3 = the outer radius
-0 $4 = the inner radius
+0 Parametric 5-point star outline using diameter*
+0 $1 = outer diameter (from params)*
+0 $2 = rotation degrees (from params)*
+0 $3 = the outer radius*
+0 $4 = the inner radius*
 $3=$1x0.5*
 $4=$3x0.4*
 4,1,10,

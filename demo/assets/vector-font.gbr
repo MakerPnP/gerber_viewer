@@ -29,7 +29,7 @@ G04 --- Character Macros (ASCII 32 to 126) ---*
 
 G04 --- ASCII 32 (Space) ---*
 %AMVECTORFONT_32*
-0 This macro is intentionally empty
+0 This macro is intentionally empty*
 %
 
 G04 --- ASCII 33 (!) ---*

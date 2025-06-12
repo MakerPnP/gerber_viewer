@@ -119,9 +119,9 @@ D45*
 X000000000Y-020000000D03*
 
 %AMPOLYGON_LINE1*
-0 $1 = diameter
-0 $2 = gap
-0 $3 = rotation
+0 $1 = diameter*
+0 $2 = gap*
+0 $3 = rotation*
 $4=$1+$2*
 5,1,3,0,0,$1,$3*
 5,1,4,$4x1,0,$1,$3*
@@ -151,11 +151,11 @@ X028750000Y009000000D03*
 
 
 %AMSTAR5*
-0 Parametric 5-point star outline using diameter
-0 $1 = outer diameter (from params)
-0 $2 = rotation degrees (from params)
-0 $3 = the outer radius
-0 $4 = the inner radius
+0 Parametric 5-point star outline using diameter*
+0 $1 = outer diameter (from params)*
+0 $2 = rotation degrees (from params)*
+0 $3 = the outer radius*
+0 $4 = the inner radius*
 $3=$1x0.5*
 $4=$3x0.4*
 4,1,10,
@@ -214,11 +214,11 @@ X-015000000Y025000000D03*
 %ADD54PLUS1,2.5X0.25X135*%
 
 %AMCROSS1*
-0 $1 = length
-0 $2 = line width
-0 $3 = rotation
+0 $1 = length*
+0 $2 = line width*
+0 $3 = rotation*
 21,1,$1,$2,0,0,$3+45*
-0 Swap with and length, use opposite rotation
+0 Swap with and length, use opposite rotation*
 21,1,$2,$1,0,0,$3+225*
 %
 %ADD55CROSS1,2.5X0.25X0*%
@@ -228,10 +228,10 @@ G04 Roting a CROSS by 45 degrees should render exactly the same as an unrotated 
 %ADD58CROSS1,2.5X0.25X135*%
 
 %AMPLUS2*
-0 A plus made from 5 dots.
-0 This macro is useful for checking the drawing order of rotated circles.
-0 $1 = length
-0 $2 = line width
+0 A plus made from 5 dots.*
+0 This macro is useful for checking the drawing order of rotated circles.*
+0 $1 = length*
+0 $2 = line width*
 1,1,$2,0,0,0*
 1,1,$2,0,$1x0.5,$3*
 1,1,$2,0,$1x0.5,$3+90*
@@ -620,7 +620,7 @@ G04 --- Character Macros (ASCII 32 to 126) ---*
 
 G04 --- ASCII 32 (Space) ---*
 %AMVECTORFONT_32*
-0 This macro is intentionally empty
+0 This macro is intentionally empty*
 %
 
 G04 --- ASCII 33 (!) ---*
