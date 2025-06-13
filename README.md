@@ -91,8 +91,6 @@ The list of supported features will be improved as developer time permits, if yo
 | ❌         | Exposure                             | Currently only additive             |
 | ✅         | Step-repeat blocks (SR)              |                                     |
 | ❌         | Block aperture (AB)                  |                                     |
-| ❌         | File attributes (TF)                 |                                     |
-| ❌         | Aperture attributes (TA)             |                                     |
 
 ### Other UI/Rendering features
 
