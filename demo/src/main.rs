@@ -8,22 +8,22 @@ use gerber_viewer::gerber_parser::parse;
 use gerber_viewer::{draw_arrow, draw_outline, draw_crosshair, BoundingBox, GerberLayer, GerberRenderer, Transform2D, ViewState, draw_marker, UiState, ToPosition};
 
 const ENABLE_UNIQUE_SHAPE_COLORS: bool = true;
-const ENABLE_VERTEX_NUMBERING: bool = true;
-const ENABLE_SHAPE_NUMBERING: bool = true;
+const ENABLE_VERTEX_NUMBERING: bool = false;
+const ENABLE_SHAPE_NUMBERING: bool = false;
 const ZOOM_FACTOR: f32 = 0.50;
-const ROTATION_SPEED_DEG_PER_SEC: f32 = 0.0;
-const INITIAL_ROTATION: f32 = 0.0_f32.to_radians();
+const ROTATION_SPEED_DEG_PER_SEC: f32 = 45.0;
+const INITIAL_ROTATION: f32 = 45.0_f32.to_radians();
 const MIRRORING: [bool; 2] = [false, false];
 
 // for mirroring and rotation
-const CENTER_OFFSET: Vector2<f64> = Vector2::new(0.0, 0.0);
-//const CENTER_OFFSET: Vector2<f64> = Vector2::new(15.0, 20.0);
+//const CENTER_OFFSET: Vector2<f64> = Vector2::new(0.0, 0.0);
+const CENTER_OFFSET: Vector2<f64> = Vector2::new(15.0, 20.0);
 //const CENTER_OFFSET: Vector2<f64> = Vector2::new(14.75, 6.0);
 
 // in EDA tools like DipTrace, a gerber offset can be specified when exporting gerbers, e.g. 10,5.
 // use negative offsets here to relocate the gerber back to 0,0, e.g. -10, -5
-const DESIGN_OFFSET: Vector2<f64> = Vector2::new(0.0, 0.0);
-//const DESIGN_OFFSET: Vector2<f64> = Vector2::new(-5.0, -10.0);
+//const DESIGN_OFFSET: Vector2<f64> = Vector2::new(0.0, 0.0);
+const DESIGN_OFFSET: Vector2<f64> = Vector2::new(-5.0, -10.0);
 //const DESIGN_OFFSET: Vector2<f64> = Vector2::new(-10.0, -10.0);
 
 // radius of the markers, in gerber coordinates
@@ -41,8 +41,8 @@ struct DemoApp {
 
 impl DemoApp {
     pub fn new() -> Self {
-        //let demo_str = include_str!("../assets/demo.gbr").as_bytes();
-        let demo_str = include_str!("../assets/mirroring-rotation-scaling.gbr").as_bytes();
+        let demo_str = include_str!("../assets/demo.gbr").as_bytes();
+        //let demo_str = include_str!("../assets/mirroring-rotation-scaling.gbr").as_bytes();
         //let demo_str = include_str!("../assets/aperture-block-simple.gbr").as_bytes();
         //let demo_str = include_str!("../assets/vector-font.gbr").as_bytes();
         //let demo_str = include_str!("../assets/diptrace-outline-test-1/BoardOutline.gbr").as_bytes();
