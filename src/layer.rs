@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
-use std::ops::Add;
+use std::ops::{Add, Range};
 use std::sync::Arc;
 
-use gerber_types::{Circle, InterpolationMode, QuadrantMode, StepAndRepeat};
+use gerber_types::{ApertureBlock, Circle, InterpolationMode, QuadrantMode, StepAndRepeat};
 use log::{debug, error, info, trace, warn};
 use nalgebra::{Point2, Vector2};
 
@@ -183,14 +183,16 @@ impl GerberLayer {
             coords
                 .x
                 .map(|value| value.into())
+                .map(|value: f64| value + offset.x)
                 .unwrap_or(current_pos.x),
             coords
                 .y
                 .map(|value| value.into())
+                .map(|value: f64| value + offset.y)
                 .unwrap_or(current_pos.y),
         );
 
-        *current_pos = Point2::new(x, y) + offset;
+        *current_pos = Point2::new(x, y);
     }
 
     fn calculate_bounding_box(primitives: &Vec<GerberPrimitive>) -> BoundingBox {
@@ -238,15 +240,64 @@ impl GerberLayer {
 
         // Second pass - collect aperture definitions, build their primitives (using supplied args)
 
-        let mut apertures: HashMap<i32, ApertureKind> = HashMap::default();
+        #[derive(Debug, Clone)]
+        struct BlockAperture {
+            code: i32,
+            range: Range<usize>,
+        }
 
-        for cmd in commands.iter() {
-            if let Command::ExtendedCode(ExtendedCode::ApertureDefinition(ApertureDefinition {
-                code,
-                aperture,
-            })) = cmd
-            {
-                match aperture {
+        #[derive(Debug)]
+        enum LocalApertureKind {
+            Standard(ApertureKind),
+            Block(BlockAperture),
+        }
+
+        let mut apertures: HashMap<i32, LocalApertureKind> = HashMap::default();
+
+        // entries are pushed onto the stack as AB 'open' commands are found
+        // popped off the stack and stored in the aperture definitions when a corresponding AB 'close' command is encountered.
+
+        let mut aperture_block_discovery_stack: Vec<ApertureBlockDiscovery> = Vec::new();
+        #[derive(Debug, Clone)]
+        struct ApertureBlockDiscovery {
+            code: i32,
+            start: usize,
+            // the end is unknown until the corresponding AB 'close' command is encountered
+        }
+
+        for (index, command) in commands.iter().enumerate() {
+            match command {
+                Command::ExtendedCode(ExtendedCode::ApertureBlock(ApertureBlock::Open {
+                    code,
+                })) => {
+                    let discovery = ApertureBlockDiscovery {
+                        code: *code,
+                        start: index,
+                    };
+                    trace!("aperture block discovery started. discovery: {:?}", discovery);
+
+                    aperture_block_discovery_stack.push(discovery);
+                }
+                Command::ExtendedCode(ExtendedCode::ApertureBlock(ApertureBlock::Close)) => {
+                    if let Some(discovery) = aperture_block_discovery_stack.last_mut() {
+                        let block = BlockAperture {
+                            code: discovery.code,
+                            // +1 and -1 to exclude the AB 'open/close' commands themselves
+                            range: Range {
+                                start: discovery.start + 1,
+                                end: index - 1,
+                            },
+                        };
+                        trace!("aperture block discovery completed. block: {:?}", block);
+                        apertures.insert(discovery.code, LocalApertureKind::Block(block));
+                    } else {
+                        error!("Aperture block close without matching open");
+                    }
+                }
+                Command::ExtendedCode(ExtendedCode::ApertureDefinition(ApertureDefinition {
+                    code,
+                    aperture,
+                })) => match aperture {
                     Aperture::Macro(macro_name, args) => {
                         // Handle macro-based apertures
 
@@ -593,7 +644,7 @@ impl GerberLayer {
 
                             trace!("primitive_defs: {:?}", primitive_defs);
 
-                            apertures.insert(*code, ApertureKind::Macro(primitive_defs));
+                            apertures.insert(*code, LocalApertureKind::Standard(ApertureKind::Macro(primitive_defs)));
                         } else {
                             error!(
                                 "Aperture definition references unknown macro. macro_name: {}",
@@ -602,9 +653,13 @@ impl GerberLayer {
                         }
                     }
                     _ => {
-                        apertures.insert(*code, ApertureKind::Standard(aperture.clone()));
+                        apertures.insert(
+                            *code,
+                            LocalApertureKind::Standard(ApertureKind::Standard(aperture.clone())),
+                        );
                     }
-                }
+                },
+                _ => {}
             }
         }
         info!("macros: {:?}", macro_definitions.len());
@@ -615,8 +670,9 @@ impl GerberLayer {
         // Third pass: collect all primitives, handle regions and step-repeat blocks
 
         let mut layer_primitives = Vec::new();
-        let mut current_aperture = None;
         let mut current_pos = Point2::new(0.0, 0.0);
+
+        let mut current_aperture = None;
         let mut current_aperture_width = 0.0;
         let mut interpolation_mode = InterpolationMode::Linear;
         let mut quadrant_mode = QuadrantMode::Single;
@@ -635,10 +691,81 @@ impl GerberLayer {
         // not using an option here to keep the math simple
         let mut step_repeat_offset: Vector2<f64> = Vector2::new(0.0, 0.0);
 
+        #[derive(Debug, Clone)]
+        struct ApertureBlockReplayState<'a> {
+            block: &'a BlockAperture,
+            initial_position: Point2<f64>,
+            initial_index: usize,
+            initial_offset: Vector2<f64>,
+        }
+
+        let mut aperture_block_replay_stack: Vec<ApertureBlockReplayState> = vec![];
+        let mut aperture_block_offset: Vector2<f64> = Vector2::new(0.0, 0.0);
+
         loop {
+            trace!("aperture_block_replay_stack: {:?}", aperture_block_replay_stack);
+            if let Some(state) = aperture_block_replay_stack.last_mut() {
+                if index > state.block.range.end {
+                    trace!("completed aperture block replay");
+                    current_pos = state.initial_position;
+                    aperture_block_offset = state.initial_offset;
+
+                    // restore the current aperture to this one, since it may be re-used by the next flash command
+                    // before another Dxx code is encountered.
+                    current_aperture = apertures.get(&state.block.code);
+
+                    // skip the same command, otherwise we'd repeat forever
+                    index = state.initial_index + 1;
+                    aperture_block_replay_stack.pop();
+                }
+            }
+
+            trace!(
+                "index: {}, current_position: {}, step_repeat_offset: ({},{}), aperture_block_offset: ({},{})",
+                index,
+                current_pos,
+                step_repeat_offset.x,
+                step_repeat_offset.y,
+                aperture_block_offset.x,
+                aperture_block_offset.y
+            );
             let Some(cmd) = commands.get(index) else { break };
 
             match cmd {
+                Command::ExtendedCode(ExtendedCode::ApertureBlock(ApertureBlock::Open {
+                    code,
+                })) => {
+                    // We can get here on an outer block in the case of nested blocked
+                    if !aperture_block_replay_stack.is_empty() {
+                        trace!("AB (open) during replay");
+                    } else {
+                        // we're waiting for a block aperture to be selected
+                    }
+
+                    // we already discovered the block, get the corresponding block then
+                    // jump the the command after it.
+                    let block = apertures.get(code).unwrap();
+                    if let LocalApertureKind::Block(block) = block {
+                        // +1 for the AB close itself, +1 again so we start on the command after it.
+                        index = block.range.end + 2;
+                        trace!("AB (open), skipping to: {:?}", index);
+                        continue;
+                    } else {
+                        error!("AB (open) not using an aperture block definition");
+                    }
+                }
+                Command::ExtendedCode(ExtendedCode::ApertureBlock(ApertureBlock::Close)) => {
+                    // We can get here on an outer block in the case of nested blocked
+                    if !aperture_block_replay_stack.is_empty() {
+                        trace!("AB (close) during replay");
+                    } else {
+                        // we're waiting for a block aperture to be selected
+                    }
+
+                    // this shouldnt happen, since the block range should cause this to be skipped
+                    // when the AP (open) is processed
+                    error!("AB (close) encountered during 3rd pass");
+                }
                 Command::ExtendedCode(ExtendedCode::StepAndRepeat(StepAndRepeat::Open {
                     repeat_x,
                     repeat_y,
@@ -764,15 +891,21 @@ impl GerberLayer {
                     current_aperture = apertures.get(&code);
 
                     match current_aperture {
-                        Some(ApertureKind::Standard(Aperture::Circle(params))) => {
-                            current_aperture_width = params.diameter;
+                        Some(LocalApertureKind::Standard(gerber_aperture)) => {
+                            match gerber_aperture {
+                                ApertureKind::Standard(Aperture::Circle(params)) => {
+                                    current_aperture_width = params.diameter;
+                                }
+                                _ => {
+                                    // Handle other standard aperture types...
+                                }
+                            }
                         }
-                        Some(_) => {
-                            // Handle other aperture types...
-                        }
-
                         None => {
                             aperture_selection_errors.insert(*code);
+                        }
+                        _ => {
+                            // nothing special to do
                         }
                     }
                 }
@@ -780,7 +913,7 @@ impl GerberLayer {
                     match operation {
                         Operation::Move(coords) => {
                             let mut end = current_pos;
-                            Self::update_position(&mut end, coords, step_repeat_offset);
+                            Self::update_position(&mut end, coords, step_repeat_offset + aperture_block_offset);
                             if in_region {
                                 // In a region, a move operation starts a new path segment
                                 // If we already have vertices, close the current segment
@@ -794,16 +927,18 @@ impl GerberLayer {
                         }
                         Operation::Interpolate(coords, offset) => {
                             let mut end = current_pos;
-                            Self::update_position(&mut end, coords, step_repeat_offset);
+                            Self::update_position(&mut end, coords, step_repeat_offset + aperture_block_offset);
                             if in_region {
                                 // Add vertex to current region
                                 current_region_vertices.push(end);
                             } else if let Some(aperture) = current_aperture {
                                 match interpolation_mode {
                                     InterpolationMode::Linear => match aperture {
-                                        ApertureKind::Standard(Aperture::Circle(Circle {
-                                            diameter, ..
-                                        })) => {
+                                        LocalApertureKind::Standard(ApertureKind::Standard(Aperture::Circle(
+                                            Circle {
+                                                diameter, ..
+                                            },
+                                        ))) => {
                                             layer_primitives.push(GerberPrimitive::Line(LineGerberPrimitive {
                                                 start: current_pos,
                                                 end,
@@ -921,11 +1056,15 @@ impl GerberLayer {
                             if in_region {
                                 warn!("Flash operation found within region - ignoring");
                             } else {
-                                Self::update_position(&mut current_pos, coords, step_repeat_offset);
+                                Self::update_position(
+                                    &mut current_pos,
+                                    coords,
+                                    step_repeat_offset + aperture_block_offset,
+                                );
 
                                 if let Some(aperture) = current_aperture {
                                     match aperture {
-                                        ApertureKind::Macro(macro_primitives) => {
+                                        LocalApertureKind::Standard(ApertureKind::Macro(macro_primitives)) => {
                                             for primitive in macro_primitives {
                                                 let mut primitive = primitive.clone();
                                                 // Update the primitive's position based on flash coordinates
@@ -965,7 +1104,7 @@ impl GerberLayer {
                                                 layer_primitives.push(primitive);
                                             }
                                         }
-                                        ApertureKind::Standard(aperture) => {
+                                        LocalApertureKind::Standard(ApertureKind::Standard(aperture)) => {
                                             match aperture {
                                                 Aperture::Circle(Circle {
                                                     diameter,
@@ -1103,6 +1242,21 @@ impl GerberLayer {
                                                     warn!("Unsupported macro aperture: {:?}, code: {}", aperture, code);
                                                 }
                                             }
+                                        }
+                                        LocalApertureKind::Block(block) => {
+                                            trace!("flashing block aperture: {:?}", block);
+
+                                            let state = ApertureBlockReplayState {
+                                                block,
+                                                initial_position: current_pos,
+                                                initial_index: index,
+                                                initial_offset: aperture_block_offset,
+                                            };
+                                            aperture_block_replay_stack.push(state);
+
+                                            aperture_block_offset = current_pos.to_vector();
+                                            index = block.range.start;
+                                            continue;
                                         }
                                     }
                                 }
