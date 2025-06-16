@@ -90,7 +90,7 @@ The list of supported features will be improved as developer time permits, if yo
 | ✅         | Circular plotting (G02/G03)          | Currently only with circle aperture |
 | ❌         | Exposure                             | Currently only additive             |
 | ✅         | Step-repeat blocks (SR)              |                                     |
-| ✅         | Block aperture (AB)                  |                                     |
+| ✅         | Block aperture (AB)                  | Including nesting                   |
 
 ### Other UI/Rendering features
 
