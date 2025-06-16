@@ -50,6 +50,7 @@ impl DemoApp {
         //let demo_str = include_str!("../assets/diptrace-outline-test-1/BoardOutline.gbr").as_bytes();
         //let demo_str = include_str!("../assets/diptrace-font-test-1/TopAssembly.gbr").as_bytes();
         //let demo_str = include_str!("../assets/rectangles.gbr").as_bytes();
+        //let demo_str = include_str!("../assets/region-non-overlapping-contours.gbr").as_bytes();
         //let demo_str = include_str!("../assets/arcs.gbr").as_bytes();
         //let demo_str = include_str!("../assets/arcs-90.gbr").as_bytes();
         //let demo_str = include_str!("../assets/macro-centerline.gbr").as_bytes();

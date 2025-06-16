@@ -867,49 +867,10 @@ impl GerberLayer {
                 Command::FunctionCode(FunctionCode::GCode(GCode::RegionMode(enabled))) => {
                     if *enabled {
                         // G36 - Begin Region
-                        in_region = true;
-                        current_region_vertices.clear();
+                        Self::region_begin(&mut current_region_vertices, &mut in_region);
                     } else {
                         // G37 - End Region
-                        if in_region && current_region_vertices.len() >= 3 {
-                            // Find bounding box
-                            let min_x = current_region_vertices
-                                .iter()
-                                .map(|position| position.x)
-                                .fold(f64::INFINITY, f64::min);
-                            let max_x = current_region_vertices
-                                .iter()
-                                .map(|position| position.x)
-                                .fold(f64::NEG_INFINITY, f64::max);
-                            let min_y = current_region_vertices
-                                .iter()
-                                .map(|position| position.y)
-                                .fold(f64::INFINITY, f64::min);
-                            let max_y = current_region_vertices
-                                .iter()
-                                .map(|position| position.y)
-                                .fold(f64::NEG_INFINITY, f64::max);
-
-                            // Calculate center from bounding box
-                            let center_x = (min_x + max_x) / 2.0;
-                            let center_y = (min_y + max_y) / 2.0;
-
-                            let center = Vector2::new(center_x, center_y);
-
-                            // Make vertices relative to center
-                            let relative_vertices: Vec<Point2<f64>> = current_region_vertices
-                                .iter()
-                                .map(|position| *position - center)
-                                .collect();
-
-                            let polygon = GerberPrimitive::new_polygon(GerberPolygon {
-                                center: Point2::new(center_x, center_y),
-                                vertices: relative_vertices,
-                                exposure: Exposure::Add,
-                            });
-                            layer_primitives.push(polygon);
-                            in_region = false;
-                        }
+                        Self::region_finalize(&mut layer_primitives, &mut current_region_vertices, &mut in_region);
                     }
                 }
 
@@ -930,9 +891,10 @@ impl GerberLayer {
                                 if !current_region_vertices.is_empty() {
                                     current_region_vertices.push(*current_region_vertices.first().unwrap());
                                 }
-                                // Start new segment
-                                // FIXME why is this commented out? unfinished? create a reference file with a region that contains a move operation and update accordingly
-                                //current_region_vertices.push(end);
+                                Self::region_finalize(&mut layer_primitives, &mut current_region_vertices, &mut in_region);
+                                // Start a new segment
+                                Self::region_begin(&mut current_region_vertices, &mut in_region);
+                                current_region_vertices.push(end);
                             }
                             current_pos = end;
                         }
@@ -1305,6 +1267,53 @@ impl GerberLayer {
         trace!("layer_primitives: {:?}", layer_primitives);
 
         layer_primitives
+    }
+
+    fn region_begin(current_region_vertices: &mut Vec<Point2<f64>>, in_region: &mut bool) {
+        *in_region = true;
+        current_region_vertices.clear();
+    }
+
+    fn region_finalize(layer_primitives: &mut Vec<GerberPrimitive>, current_region_vertices: &mut Vec<Point2<f64>>, in_region: &mut bool) {
+        if *in_region && current_region_vertices.len() >= 3 {
+            // Find bounding box
+            let min_x = current_region_vertices
+                .iter()
+                .map(|position| position.x)
+                .fold(f64::INFINITY, f64::min);
+            let max_x = current_region_vertices
+                .iter()
+                .map(|position| position.x)
+                .fold(f64::NEG_INFINITY, f64::max);
+            let min_y = current_region_vertices
+                .iter()
+                .map(|position| position.y)
+                .fold(f64::INFINITY, f64::min);
+            let max_y = current_region_vertices
+                .iter()
+                .map(|position| position.y)
+                .fold(f64::NEG_INFINITY, f64::max);
+
+            // Calculate center from bounding box
+            let center_x = (min_x + max_x) / 2.0;
+            let center_y = (min_y + max_y) / 2.0;
+
+            let center = Vector2::new(center_x, center_y);
+
+            // Make vertices relative to center
+            let relative_vertices: Vec<Point2<f64>> = current_region_vertices
+                .iter()
+                .map(|position| *position - center)
+                .collect();
+
+            let polygon = GerberPrimitive::new_polygon(GerberPolygon {
+                center: Point2::new(center_x, center_y),
+                vertices: relative_vertices,
+                exposure: Exposure::Add,
+            });
+            layer_primitives.push(polygon);
+        }
+        *in_region = false;
     }
 }
 
