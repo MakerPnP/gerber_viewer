@@ -710,11 +710,21 @@ impl GerberLayer {
             if let Some(state) = aperture_block_replay_stack.last_mut() {
                 if index > state.block.range.end {
                     trace!("completed aperture block replay");
+
+                    // The gerber spec says: "After an AB statemen[t] the graphics state remains as it is at the end of
+                    // the AB definition, except for the current point, which is undefined. (Gerber has no stack of
+                    // graphics states.)"
+                    // but let's be consistent by resetting the position to the position when the block we started.
+                    // We could just not do this, which might be more 'compliant', but inconsistent.
+
                     current_pos = state.initial_position;
-                    aperture_block_offset = state.initial_offset;
                     interpolation_mode = state.initial_interpolation_mode;
                     quadrant_mode = state.initial_quadrant_mode;
-
+                    
+                    // furthermore, the statement in the spec "Gerber has no stack of graphics states" is misleading,
+                    // since we have to reset the current aperture and restore the offset, both of which require
+                    // a 'stack of graphic states'.
+                    aperture_block_offset = state.initial_offset;
                     // restore the current aperture to this one, since it may be re-used by the next flash command
                     // before another Dxx code is encountered.
                     current_aperture = apertures.get(&state.block.code);
