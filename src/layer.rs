@@ -674,7 +674,6 @@ impl GerberLayer {
         let mut current_pos = Point2::new(0.0, 0.0);
 
         let mut current_aperture = None;
-        let mut current_aperture_width = 0.0;
         let mut interpolation_mode = InterpolationMode::Linear;
         let mut quadrant_mode = QuadrantMode::Single;
 
@@ -916,24 +915,8 @@ impl GerberLayer {
 
                 Command::FunctionCode(FunctionCode::DCode(DCode::SelectAperture(code))) => {
                     current_aperture = apertures.get(&code);
-
-                    match current_aperture {
-                        Some(LocalApertureKind::Standard(gerber_aperture)) => {
-                            match gerber_aperture {
-                                ApertureKind::Standard(Aperture::Circle(params)) => {
-                                    current_aperture_width = params.diameter;
-                                }
-                                _ => {
-                                    // Handle other standard aperture types...
-                                }
-                            }
-                        }
-                        None => {
-                            aperture_selection_errors.insert(*code);
-                        }
-                        _ => {
-                            // nothing special to do
-                        }
+                    if current_aperture.is_none() {
+                        aperture_selection_errors.insert(*code);
                     }
                 }
                 Command::FunctionCode(FunctionCode::DCode(DCode::Operation(operation))) => {
@@ -948,6 +931,7 @@ impl GerberLayer {
                                     current_region_vertices.push(*current_region_vertices.first().unwrap());
                                 }
                                 // Start new segment
+                                // FIXME why is this commented out? unfinished? create a reference file with a region that contains a move operation and update accordingly
                                 //current_region_vertices.push(end);
                             }
                             current_pos = end;
@@ -956,124 +940,135 @@ impl GerberLayer {
                             let mut end = current_pos;
                             Self::update_position(&mut end, coords, step_repeat_offset + aperture_block_offset);
                             if in_region {
-                                // Add vertex to current region
+                                // Add vertex to the current region
                                 current_region_vertices.push(end);
-                            } else if let Some(aperture) = current_aperture {
-                                match interpolation_mode {
-                                    InterpolationMode::Linear => match aperture {
-                                        LocalApertureKind::Standard(ApertureKind::Standard(Aperture::Circle(
-                                            Circle {
-                                                diameter, ..
-                                            },
-                                        ))) => {
-                                            layer_primitives.push(GerberPrimitive::Line(LineGerberPrimitive {
-                                                start: current_pos,
-                                                end,
-                                                width: *diameter,
-                                                exposure: Exposure::Add,
-                                            }));
-                                        }
-                                        _ => {
-                                            warn!(
-                                                "Unsupported aperture for linear interpolation. aperture: {:?}",
-                                                aperture
-                                            );
-                                        }
-                                    },
-                                    InterpolationMode::ClockwiseCircular
-                                    | InterpolationMode::CounterclockwiseCircular => {
-                                        // Handle circular interpolation
-                                        if let Some(offset) = offset {
-                                            // Get I and J offsets (relative to current position)
-                                            let offset_i = offset
-                                                .x
-                                                .map(|x| x.into())
-                                                .unwrap_or(0.0);
-                                            let offset_j = offset
-                                                .y
-                                                .map(|y| y.into())
-                                                .unwrap_or(0.0);
+                            } else {
+                                match current_aperture {
+                                    // 2024.05 - 2.3 "Graphical objects"
+                                    // "The solid circle standard aperture is the only aperture allowed for creating draw or arc objects.
+                                    // Other standard apertures or macro apertures that fortuitously have a circular shape are not
+                                    // allowed."
+                                    Some(LocalApertureKind::Standard(ApertureKind::Standard(Aperture::Circle(
+                                        circle,
+                                    )))) => {
+                                        // get the stroke width with the aperture definition
+                                        let stroke_width = circle.diameter;
 
-                                            // Calculate center of the arc
-                                            let center_x = current_pos.x + offset_i;
-                                            let center_y = current_pos.y + offset_j;
-                                            let center = Point2::new(center_x, center_y);
-
-                                            // Calculate radius (distance from current position to center)
-                                            let radius = ((offset_i * offset_i) + (offset_j * offset_j)).sqrt();
-
-                                            // Calculate start angle (from center to current position)
-                                            let start_angle =
-                                                (current_pos.y - center.y).atan2(current_pos.x - center.x);
-
-                                            // Calculate end angle (from center to target position)
-                                            let end_angle = (end.y - center.y).atan2(end.x - center.x);
-
-                                            // Calculate sweep angle based on interpolation mode
-                                            let mut sweep_angle = match interpolation_mode {
-                                                InterpolationMode::ClockwiseCircular => {
-                                                    if end_angle > start_angle {
-                                                        end_angle - start_angle - 2.0 * std::f64::consts::PI
-                                                    } else {
-                                                        end_angle - start_angle
-                                                    }
-                                                }
-                                                InterpolationMode::CounterclockwiseCircular => {
-                                                    if end_angle < start_angle {
-                                                        end_angle - start_angle + 2.0 * std::f64::consts::PI
-                                                    } else {
-                                                        end_angle - start_angle
-                                                    }
-                                                }
-                                                _ => 0.0, // Should never happen
-                                            };
-
-                                            // Adjust for single/multi quadrant mode
-                                            if let QuadrantMode::Single = quadrant_mode {
-                                                // In single quadrant mode, sweep angle is always <= 90°
-                                                if sweep_angle.abs() > std::f64::consts::PI / 2.0 {
-                                                    if sweep_angle > 0.0 {
-                                                        sweep_angle = std::f64::consts::PI / 2.0;
-                                                    } else {
-                                                        sweep_angle = -std::f64::consts::PI / 2.0;
-                                                    }
-                                                }
-                                            }
-
-                                            let arc_primitive = ArcGerberPrimitive {
-                                                center,
-                                                radius,
-                                                width: current_aperture_width,
-                                                start_angle,
-                                                sweep_angle,
-                                                exposure: Exposure::Add,
-                                            };
-
-                                            if arc_primitive.is_full_circle() {
-                                                // add the arc primitive
-                                                layer_primitives.push(GerberPrimitive::Arc(arc_primitive));
-                                            } else {
-                                                let points = arc_primitive.generate_points();
-
-                                                // draw a circle primitive at the start
-                                                let start_point = points.first().unwrap();
-                                                layer_primitives.push(GerberPrimitive::Circle(CircleGerberPrimitive {
-                                                    center: start_point + center.to_vector(),
-                                                    diameter: current_aperture_width,
-                                                    exposure: Exposure::Add,
-                                                }));
-
-                                                layer_primitives.push(GerberPrimitive::Arc(arc_primitive));
-
-                                                // draw a circle primitive at the end
-                                                let end_point = points.last().unwrap();
-                                                layer_primitives.push(GerberPrimitive::Circle(CircleGerberPrimitive {
-                                                    center: end_point + center.to_vector(),
-                                                    diameter: current_aperture_width,
+                                        match interpolation_mode {
+                                            InterpolationMode::Linear => {
+                                                layer_primitives.push(GerberPrimitive::Line(LineGerberPrimitive {
+                                                    start: current_pos,
+                                                    end,
+                                                    width: stroke_width,
                                                     exposure: Exposure::Add,
                                                 }));
                                             }
+                                            InterpolationMode::ClockwiseCircular
+                                            | InterpolationMode::CounterclockwiseCircular => {
+                                                // Handle circular interpolation
+                                                if let Some(offset) = offset {
+                                                    // Get I and J offsets (relative to current position)
+                                                    let offset_i = offset
+                                                        .x
+                                                        .map(|x| x.into())
+                                                        .unwrap_or(0.0);
+                                                    let offset_j = offset
+                                                        .y
+                                                        .map(|y| y.into())
+                                                        .unwrap_or(0.0);
+
+                                                    // Calculate center of the arc
+                                                    let center_x = current_pos.x + offset_i;
+                                                    let center_y = current_pos.y + offset_j;
+                                                    let center = Point2::new(center_x, center_y);
+
+                                                    // Calculate radius (distance from current position to center)
+                                                    let radius = ((offset_i * offset_i) + (offset_j * offset_j)).sqrt();
+
+                                                    // Calculate start angle (from center to current position)
+                                                    let start_angle =
+                                                        (current_pos.y - center.y).atan2(current_pos.x - center.x);
+
+                                                    // Calculate end angle (from center to target position)
+                                                    let end_angle = (end.y - center.y).atan2(end.x - center.x);
+
+                                                    // Calculate sweep angle based on interpolation mode
+                                                    let mut sweep_angle = match interpolation_mode {
+                                                        InterpolationMode::ClockwiseCircular => {
+                                                            if end_angle > start_angle {
+                                                                end_angle - start_angle - 2.0 * std::f64::consts::PI
+                                                            } else {
+                                                                end_angle - start_angle
+                                                            }
+                                                        }
+                                                        InterpolationMode::CounterclockwiseCircular => {
+                                                            if end_angle < start_angle {
+                                                                end_angle - start_angle + 2.0 * std::f64::consts::PI
+                                                            } else {
+                                                                end_angle - start_angle
+                                                            }
+                                                        }
+                                                        _ => 0.0, // Should never happen
+                                                    };
+
+                                                    // Adjust for single/multi quadrant mode
+                                                    if let QuadrantMode::Single = quadrant_mode {
+                                                        // In single quadrant mode, sweep angle is always <= 90°
+                                                        if sweep_angle.abs() > std::f64::consts::PI / 2.0 {
+                                                            if sweep_angle > 0.0 {
+                                                                sweep_angle = std::f64::consts::PI / 2.0;
+                                                            } else {
+                                                                sweep_angle = -std::f64::consts::PI / 2.0;
+                                                            }
+                                                        }
+                                                    }
+
+                                                    let arc_primitive = ArcGerberPrimitive {
+                                                        center,
+                                                        radius,
+                                                        width: stroke_width,
+                                                        start_angle,
+                                                        sweep_angle,
+                                                        exposure: Exposure::Add,
+                                                    };
+
+                                                    if arc_primitive.is_full_circle() {
+                                                        // add the arc primitive
+                                                        layer_primitives.push(GerberPrimitive::Arc(arc_primitive));
+                                                    } else {
+                                                        let points = arc_primitive.generate_points();
+
+                                                        // draw a circle primitive at the start
+                                                        let start_point = points.first().unwrap();
+                                                        layer_primitives.push(GerberPrimitive::Circle(
+                                                            CircleGerberPrimitive {
+                                                                center: start_point + center.to_vector(),
+                                                                diameter: stroke_width,
+                                                                exposure: Exposure::Add,
+                                                            },
+                                                        ));
+
+                                                        layer_primitives.push(GerberPrimitive::Arc(arc_primitive));
+
+                                                        // draw a circle primitive at the end
+                                                        let end_point = points.last().unwrap();
+                                                        layer_primitives.push(GerberPrimitive::Circle(
+                                                            CircleGerberPrimitive {
+                                                                center: end_point + center.to_vector(),
+                                                                diameter: stroke_width,
+                                                                exposure: Exposure::Add,
+                                                            },
+                                                        ));
+                                                    }
+                                                }
+                                            }
                                         }
+                                    }
+                                    Some(aperture) => {
+                                        warn!("Unsupported aperture for plotting. aperture: {:?}", aperture);
+                                    }
+                                    None => {
+                                        error!("No aperture selected for plotting");
                                     }
                                 }
                             }
