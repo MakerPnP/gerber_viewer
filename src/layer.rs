@@ -777,64 +777,72 @@ impl GerberLayer {
                     distance_x,
                     distance_y,
                 })) => {
-                    if step_repeat_state.is_some() {
-                        error!("Step repeat open without matching close");
+                    if !aperture_block_replay_stack.is_empty() {
+                        trace!("SR (open) during AB replay");
                     } else {
-                        let state = StepRepeatState {
-                            initial_position: current_pos,
-                            repeat_x: *repeat_x,
-                            repeat_y: *repeat_y,
-                            distance_x: *distance_x,
-                            distance_y: *distance_y,
-                            start_index: index + 1,
-                            x_index: 0,
-                            y_index: 0,
-                        };
-                        trace!("Step-and-repeat open, state: {:?}", state);
-                        step_repeat_state = Some(state);
+                        if step_repeat_state.is_some() {
+                            error!("Step repeat open without matching close");
+                        } else {
+                            let state = StepRepeatState {
+                                initial_position: current_pos,
+                                repeat_x: *repeat_x,
+                                repeat_y: *repeat_y,
+                                distance_x: *distance_x,
+                                distance_y: *distance_y,
+                                start_index: index + 1,
+                                x_index: 0,
+                                y_index: 0,
+                            };
+                            trace!("Step-and-repeat open, state: {:?}", state);
+                            step_repeat_state = Some(state);
+                        }
                     }
                 }
                 Command::ExtendedCode(ExtendedCode::StepAndRepeat(StepAndRepeat::Close)) => {
-                    if let Some(state) = &mut step_repeat_state {
-                        let mut complete = false;
-                        state.y_index += 1;
-                        if state.y_index >= state.repeat_y {
-                            state.y_index = 0;
-
-                            state.x_index += 1;
-                            if state.x_index >= state.repeat_x {
-                                complete = true;
-                            }
-                        }
-
-                        // The gerber spec says "The current point is undefined after an SR statement."
-                        // but let's be consistent by resetting the position to the position when the
-                        // block we started, for commands AFTER the step-repeat and for commands
-                        // in the next step-repeat iteration.
-                        // We could just not do this, which might be more 'compliant', but inconsistent.
-                        current_pos = state.initial_position;
-
-                        if complete {
-                            trace!("Step-and-repeat close");
-                            step_repeat_offset = Vector2::new(0.0, 0.0);
-                            step_repeat_state = None;
-                        } else {
-                            step_repeat_offset = Vector2::new(
-                                state.distance_x * state.x_index as f64,
-                                state.distance_y * state.y_index as f64,
-                            );
-
-                            trace!(
-                                "Step-and-repeat continue, state: {:?}, current_position: {:?}",
-                                state,
-                                current_pos
-                            );
-
-                            index = state.start_index;
-                            continue;
-                        }
+                    if !aperture_block_replay_stack.is_empty() {
+                        trace!("SR (close) during AB replay");
                     } else {
-                        error!("Step repeat close without matching open");
+                        if let Some(state) = &mut step_repeat_state {
+                            let mut complete = false;
+                            state.y_index += 1;
+                            if state.y_index >= state.repeat_y {
+                                state.y_index = 0;
+
+                                state.x_index += 1;
+                                if state.x_index >= state.repeat_x {
+                                    complete = true;
+                                }
+                            }
+
+                            // The gerber spec says "The current point is undefined after an SR statement."
+                            // but let's be consistent by resetting the position to the position when the
+                            // block we started, for commands AFTER the step-repeat and for commands
+                            // in the next step-repeat iteration.
+                            // We could just not do this, which might be more 'compliant', but inconsistent.
+                            current_pos = state.initial_position;
+
+                            if complete {
+                                trace!("Step-and-repeat close");
+                                step_repeat_offset = Vector2::new(0.0, 0.0);
+                                step_repeat_state = None;
+                            } else {
+                                step_repeat_offset = Vector2::new(
+                                    state.distance_x * state.x_index as f64,
+                                    state.distance_y * state.y_index as f64,
+                                );
+
+                                trace!(
+                                    "Step-and-repeat continue, state: {:?}, current_position: {:?}",
+                                    state,
+                                    current_pos
+                                );
+
+                                index = state.start_index;
+                                continue;
+                            }
+                        } else {
+                            error!("Step repeat close without matching open");
+                        }
                     }
                 }
                 Command::FunctionCode(FunctionCode::GCode(GCode::InterpolationMode(mode))) => {
