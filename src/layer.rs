@@ -290,6 +290,7 @@ impl GerberLayer {
                         };
                         trace!("aperture block discovery completed. block: {:?}", block);
                         apertures.insert(discovery.code, LocalApertureKind::Block(block));
+                        aperture_block_discovery_stack.pop();
                     } else {
                         error!("Aperture block close without matching open");
                     }
