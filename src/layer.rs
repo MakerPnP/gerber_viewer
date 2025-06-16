@@ -887,18 +887,21 @@ impl GerberLayer {
                             Self::update_position(&mut end, coords, step_repeat_offset + aperture_block_offset);
                             if in_region {
                                 // In a region, a move operation starts a new path segment
-                                // If we already have vertices, close the current segment
+                                // However, we may not have any segments yet, i.e. G36 immediately followed by D02
                                 if !current_region_vertices.is_empty() {
+                                    // If we have vertices, close the current segment
                                     current_region_vertices.push(*current_region_vertices.first().unwrap());
+
+                                    Self::region_finalize(
+                                        &mut layer_primitives,
+                                        &mut current_region_vertices,
+                                        &mut in_region,
+                                    );
+
+                                    // Now start a new segment
+                                    Self::region_begin(&mut current_region_vertices, &mut in_region);
+                                    current_region_vertices.push(end);
                                 }
-                                Self::region_finalize(
-                                    &mut layer_primitives,
-                                    &mut current_region_vertices,
-                                    &mut in_region,
-                                );
-                                // Start a new segment
-                                Self::region_begin(&mut current_region_vertices, &mut in_region);
-                                current_region_vertices.push(end);
                             }
                             current_pos = end;
                         }
