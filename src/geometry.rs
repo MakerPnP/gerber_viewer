@@ -47,17 +47,37 @@ impl From<Vec2b> for Mirroring {
     }
 }
 
+/// Gerber-specific transform.
+/// Transform order: -Origin, Mirroring, Rotation, *Scale, +Origin, +Offset
+///
+/// * Origin is subtracted from coordinates so that rotation and mirroring occurs around the origin.
+/// * After mirroring, rotation and scaling, Origin is then added to relocate the coordinates
+/// * Finally an offset is added
 #[derive(Debug, Copy, Clone)]
-pub struct Transform2D {
+pub struct GerberTransform {
     pub rotation_radians: f32,
     pub mirroring: Mirroring,
     // origin for rotation and mirroring, in gerber coordinates
     pub origin: Vector2<f64>,
     // offset, in gerber coordinates
     pub offset: Vector2<f64>,
+    // scale factor, 0.5 = 50%, 1.0 = 100%
+    pub scale: f64,
 }
 
-impl Transform2D {
+impl Default for GerberTransform {
+    fn default() -> Self {
+        Self {
+            rotation_radians: 0.0,
+            mirroring: Mirroring::default(),
+            origin: Vector2::new(0.0, 0.0),
+            offset: Vector2::new(0.0, 0.0),
+            scale: 1.0,
+        }
+    }
+}
+
+impl GerberTransform {
     /// Apply the transform to a logical `Point2` (Gerber-space)
     pub fn apply_to_position(&self, pos: Point2<f64>) -> Point2<f64> {
         let mut x = pos.x - self.origin.x;
@@ -76,8 +96,8 @@ impl Transform2D {
         let rotated_y = -x * sin_theta + y * cos_theta;
 
         Point2::new(
-            rotated_x + self.origin.x + self.offset.x,
-            rotated_y + self.origin.y + self.offset.y,
+            rotated_x * self.scale + self.origin.x + self.offset.x,
+            rotated_y * self.scale + self.origin.y + self.offset.y,
         )
     }
 
@@ -99,9 +119,16 @@ impl Transform2D {
         let rotated_y = x * sin_theta + y * cos_theta;
 
         Vec2::new(
-            (rotated_x + self.origin.x + self.offset.x) as f32,
-            (rotated_y + self.origin.y + self.offset.y) as f32,
+            (rotated_x * self.scale + self.origin.x + self.offset.x) as f32,
+            (rotated_y * self.scale + self.origin.y + self.offset.y) as f32,
         )
+    }
+
+    pub fn flip_y(mut self) -> Self {
+        self.offset.y = -self.offset.y;
+        self.origin.y = -self.origin.y;
+
+        self
     }
 }
 
@@ -113,7 +140,7 @@ pub struct BoundingBox {
 
 impl BoundingBox {
     /// Use to generate an outline of the bbox
-    pub fn transform_vertices(&self, transform: Transform2D) -> Vec<Point2<f64>> {
+    pub fn transform_vertices(&self, transform: GerberTransform) -> Vec<Point2<f64>> {
         self.vertices()
             .into_iter()
             .map(|v| transform.apply_to_position(v))
@@ -153,7 +180,7 @@ impl BoundingBox {
         self.max.y - self.min.y
     }
 
-    pub fn apply_transform(&self, transform: Transform2D) -> Self {
+    pub fn apply_transform(&self, transform: GerberTransform) -> Self {
         // Step 1: Transform each corner of the original bbox
         let transformed_bbox_vertices: Vec<_> = self
             .vertices()

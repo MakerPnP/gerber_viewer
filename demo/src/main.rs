@@ -5,7 +5,7 @@ use eframe::epaint::Color32;
 use egui::ViewportBuilder;
 use nalgebra::Vector2;
 use gerber_viewer::gerber_parser::parse;
-use gerber_viewer::{draw_arrow, draw_outline, draw_crosshair, BoundingBox, GerberLayer, GerberRenderer, ViewState, draw_marker, UiState, ToPosition, RenderConfiguration, Transform2D};
+use gerber_viewer::{draw_arrow, draw_outline, draw_crosshair, BoundingBox, GerberLayer, GerberRenderer, GerberTransform, ViewState, draw_marker, UiState, ToPosition, RenderConfiguration};
 
 const ENABLE_UNIQUE_SHAPE_COLORS: bool = true;
 const ENABLE_VERTEX_NUMBERING: bool = false;
@@ -35,9 +35,8 @@ struct DemoApp {
     view_state: ViewState,
     ui_state: UiState,
     needs_initial_view: bool,
-
+    transform: GerberTransform,
     last_frame_time: std::time::Instant,
-    rotation_radians: f32,
 }
 
 impl DemoApp {
@@ -81,20 +80,30 @@ impl DemoApp {
             .. RenderConfiguration::default()
         };
 
-        Self {
-            last_frame_time: std::time::Instant::now(),
-            gerber_layer,
-            view_state: Default::default(),
-            needs_initial_view: true,
+        let origin = CENTER_OFFSET - DESIGN_OFFSET;
+
+        let transform = GerberTransform {
             rotation_radians: INITIAL_ROTATION,
-            ui_state: Default::default(),
+            mirroring: MIRRORING.into(),
+            origin,
+            offset: DESIGN_OFFSET,
+            ..GerberTransform::default()
+        };
+
+        Self {
+            gerber_layer,
             renderer_configuration: renderer_config,
+            view_state: Default::default(),
+            ui_state: Default::default(),
+            needs_initial_view: true,
+            transform,
+            last_frame_time: std::time::Instant::now(),
         }
     }
 
     fn reset_view(&mut self, viewport: Rect) {
         let bbox = self.gerber_layer.bounding_box();
-        self.view_state.reset_view(viewport, bbox, ZOOM_FACTOR, CENTER_OFFSET, DESIGN_OFFSET, self.rotation_radians, MIRRORING.into());
+        self.view_state.reset_view(viewport, bbox, ZOOM_FACTOR, &self.transform);
 
         // reset the last frame time again, so that the animation starts from the beginning.
         self.last_frame_time =  std::time::Instant::now();
@@ -113,7 +122,7 @@ impl eframe::App for DemoApp {
         self.last_frame_time = now;
 
         let rotation_increment = ROTATION_SPEED_DEG_PER_SEC.to_radians() * delta;
-        self.rotation_radians += rotation_increment;
+        self.transform.rotation_radians += rotation_increment;
 
         if ROTATION_SPEED_DEG_PER_SEC > 0.0 {
             // force the UI to refresh every frame for a smooth animation
@@ -126,20 +135,11 @@ impl eframe::App for DemoApp {
 
         let bbox = self.gerber_layer.bounding_box();
 
-        let origin = CENTER_OFFSET - DESIGN_OFFSET;
-
-        let transform = Transform2D {
-            rotation_radians: self.rotation_radians,
-            mirroring: MIRRORING.into(),
-            origin,
-            offset: DESIGN_OFFSET,
-        };
-
         // Compute rotated outline (GREEN)
         let outline_vertices: Vec<_> = bbox
             .vertices()
             .into_iter()
-            .map(|v| transform.apply_to_position(v))
+            .map(|v| self.transform.apply_to_position(v))
             .collect();
 
         // Compute transformed AABB (RED)
@@ -198,10 +198,7 @@ impl eframe::App for DemoApp {
                     &self.gerber_layer,
                     Color32::WHITE,
                     &self.renderer_configuration,
-                    self.rotation_radians,
-                    MIRRORING.into(),
-                    CENTER_OFFSET.into(),
-                    DESIGN_OFFSET.into(),
+                    &self.transform,
                 );
                 
                 // if you want to display multiple layers, call `paint_layer` for each layer. 
