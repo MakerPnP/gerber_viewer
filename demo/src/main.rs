@@ -95,6 +95,9 @@ impl DemoApp {
     fn reset_view(&mut self, viewport: Rect) {
         let bbox = self.gerber_layer.bounding_box();
         self.view_state.reset_view(viewport, bbox, ZOOM_FACTOR, CENTER_OFFSET, DESIGN_OFFSET, self.rotation_radians, MIRRORING.into());
+
+        // reset the last frame time again, so that the animation starts from the beginning.
+        self.last_frame_time =  std::time::Instant::now();
         self.needs_initial_view = false;
     }
 }
