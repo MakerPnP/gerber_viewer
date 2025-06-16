@@ -44,6 +44,7 @@ impl DemoApp {
         let demo_str = include_str!("../assets/demo.gbr").as_bytes();
         //let demo_str = include_str!("../assets/mirroring-rotation-scaling.gbr").as_bytes();
         //let demo_str = include_str!("../assets/aperture-block-simple.gbr").as_bytes();
+        //let demo_str = include_str!("../assets/aperture-block-nested.gbr").as_bytes();
         //let demo_str = include_str!("../assets/vector-font.gbr").as_bytes();
         //let demo_str = include_str!("../assets/diptrace-outline-test-1/BoardOutline.gbr").as_bytes();
         //let demo_str = include_str!("../assets/diptrace-font-test-1/TopAssembly.gbr").as_bytes();
