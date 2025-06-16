@@ -5,7 +5,7 @@ use eframe::epaint::Color32;
 use egui::ViewportBuilder;
 use nalgebra::Vector2;
 use gerber_viewer::gerber_parser::parse;
-use gerber_viewer::{draw_arrow, draw_outline, draw_crosshair, BoundingBox, GerberLayer, GerberRenderer, Transform2D, ViewState, draw_marker, UiState, ToPosition};
+use gerber_viewer::{draw_arrow, draw_outline, draw_crosshair, BoundingBox, GerberLayer, GerberRenderer, ViewState, draw_marker, UiState, ToPosition, RenderConfiguration, Transform2D};
 
 const ENABLE_UNIQUE_SHAPE_COLORS: bool = true;
 const ENABLE_VERTEX_NUMBERING: bool = false;
@@ -31,12 +31,13 @@ const MARKER_RADIUS: f32 = 2.5;
 
 struct DemoApp {
     gerber_layer: GerberLayer,
+    renderer_configuration: RenderConfiguration,
     view_state: ViewState,
     ui_state: UiState,
     needs_initial_view: bool,
 
     last_frame_time: std::time::Instant,
-    rotation_radians: f32
+    rotation_radians: f32,
 }
 
 impl DemoApp {
@@ -70,6 +71,15 @@ impl DemoApp {
 
         let gerber_layer = GerberLayer::new(commands);
 
+        let renderer_config = RenderConfiguration {
+            use_unique_shape_colors: ENABLE_UNIQUE_SHAPE_COLORS,
+            use_shape_numbering: ENABLE_SHAPE_NUMBERING,
+            use_vertex_numbering: ENABLE_VERTEX_NUMBERING,
+
+            // use the default for any remaining options, doing this makes adding options easier in the future.
+            .. RenderConfiguration::default()
+        };
+
         Self {
             last_frame_time: std::time::Instant::now(),
             gerber_layer,
@@ -77,6 +87,7 @@ impl DemoApp {
             needs_initial_view: true,
             rotation_radians: INITIAL_ROTATION,
             ui_state: Default::default(),
+            renderer_configuration: renderer_config,
         }
     }
 
@@ -182,9 +193,7 @@ impl eframe::App for DemoApp {
                     self.view_state,
                     &self.gerber_layer,
                     Color32::WHITE,
-                    ENABLE_UNIQUE_SHAPE_COLORS,
-                    ENABLE_SHAPE_NUMBERING,
-                    ENABLE_VERTEX_NUMBERING,
+                    &self.renderer_configuration,
                     self.rotation_radians,
                     MIRRORING.into(),
                     CENTER_OFFSET.into(),

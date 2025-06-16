@@ -14,6 +14,26 @@ use crate::{
     Transform2D,
 };
 
+#[derive(Debug, Clone)]
+pub struct RenderConfiguration {
+    /// Gives each shape a unique color.
+    pub use_unique_shape_colors: bool,
+    /// Draws the shape number in the center of the shape.
+    pub use_shape_numbering: bool,
+    /// Draws the vertex number at the start of each line.
+    pub use_vertex_numbering: bool,
+}
+
+impl Default for RenderConfiguration {
+    fn default() -> Self {
+        Self {
+            use_unique_shape_colors: false,
+            use_shape_numbering: false,
+            use_vertex_numbering: false,
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct GerberRenderer {}
 
@@ -25,9 +45,7 @@ impl GerberRenderer {
         view: ViewState,
         layer: &GerberLayer,
         base_color: Color32,
-        use_unique_shape_colors: bool,
-        use_shape_numbering: bool,
-        use_vertex_numbering: bool,
+        configuration: &RenderConfiguration,
         // radians (positive=clockwise)
         rotation: f32,
         mirroring: Mirroring,
@@ -49,61 +67,32 @@ impl GerberRenderer {
         };
 
         for (index, primitive) in layer.primitives().iter().enumerate() {
-            let color = match use_unique_shape_colors {
+            let color = match configuration.use_unique_shape_colors {
                 true => color::generate_pastel_color(index as u64),
                 false => base_color,
             };
 
-            let shape_number = match use_shape_numbering {
+            let shape_number = match configuration.use_shape_numbering {
                 true => Some(index),
                 false => None,
             };
+
             match primitive {
-                GerberPrimitive::Circle(circle) => circle.render(
-                    painter,
-                    &view,
-                    &transform,
-                    color,
-                    rotation,
-                    shape_number,
-                    use_vertex_numbering,
-                ),
-                GerberPrimitive::Rectangle(rect) => rect.render(
-                    painter,
-                    &view,
-                    &transform,
-                    color,
-                    rotation,
-                    shape_number,
-                    use_vertex_numbering,
-                ),
-                GerberPrimitive::Line(line) => line.render(
-                    painter,
-                    &view,
-                    &transform,
-                    color,
-                    rotation,
-                    shape_number,
-                    use_vertex_numbering,
-                ),
-                GerberPrimitive::Arc(arc) => arc.render(
-                    painter,
-                    &view,
-                    &transform,
-                    color,
-                    rotation,
-                    shape_number,
-                    use_vertex_numbering,
-                ),
-                GerberPrimitive::Polygon(polygon) => polygon.render(
-                    painter,
-                    &view,
-                    &transform,
-                    color,
-                    rotation,
-                    shape_number,
-                    use_vertex_numbering,
-                ),
+                GerberPrimitive::Circle(circle) => {
+                    circle.render(painter, &view, &transform, color, rotation, shape_number, configuration)
+                }
+                GerberPrimitive::Rectangle(rect) => {
+                    rect.render(painter, &view, &transform, color, rotation, shape_number, configuration)
+                }
+                GerberPrimitive::Line(line) => {
+                    line.render(painter, &view, &transform, color, rotation, shape_number, configuration)
+                }
+                GerberPrimitive::Arc(arc) => {
+                    arc.render(painter, &view, &transform, color, rotation, shape_number, configuration)
+                }
+                GerberPrimitive::Polygon(polygon) => {
+                    polygon.render(painter, &view, &transform, color, rotation, shape_number, configuration)
+                }
             }
         }
     }
@@ -118,7 +107,7 @@ trait Renderable {
         color: Color32,
         rotation: f32,
         shape_number: Option<usize>,
-        use_vertex_numbering: bool,
+        configuration: &RenderConfiguration,
     );
 }
 
@@ -132,7 +121,7 @@ impl Renderable for CircleGerberPrimitive {
         color: Color32,
         _rotation: f32,
         shape_number: Option<usize>,
-        _use_polygon_numbering: bool,
+        _configuration: &RenderConfiguration,
     ) {
         let Self {
             center,
@@ -170,7 +159,7 @@ impl Renderable for RectangleGerberPrimitive {
         color: Color32,
         rotation: f32,
         shape_number: Option<usize>,
-        _use_polygon_numbering: bool,
+        _configuration: &RenderConfiguration,
     ) {
         let Self {
             origin,
@@ -258,7 +247,7 @@ impl Renderable for LineGerberPrimitive {
         color: Color32,
         _rotation: f32,
         shape_number: Option<usize>,
-        _use_polygon_numbering: bool,
+        _configuration: &RenderConfiguration,
     ) {
         let Self {
             start,
@@ -308,7 +297,7 @@ impl Renderable for ArcGerberPrimitive {
         color: Color32,
         _rotation: f32,
         shape_number: Option<usize>,
-        _use_polygon_numbering: bool,
+        _configuration: &RenderConfiguration,
     ) {
         let Self {
             center,
@@ -367,7 +356,7 @@ impl Renderable for PolygonGerberPrimitive {
         color: Color32,
         _rotation: f32,
         shape_number: Option<usize>,
-        use_vertex_numbering: bool,
+        configuration: &RenderConfiguration,
     ) {
         let Self {
             center,
@@ -416,7 +405,7 @@ impl Renderable for PolygonGerberPrimitive {
             })));
         }
 
-        if use_vertex_numbering {
+        if configuration.use_vertex_numbering {
             let debug_vertices: Vec<Pos2> = geometry
                 .relative_vertices
                 .iter()

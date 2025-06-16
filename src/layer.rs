@@ -891,7 +891,11 @@ impl GerberLayer {
                                 if !current_region_vertices.is_empty() {
                                     current_region_vertices.push(*current_region_vertices.first().unwrap());
                                 }
-                                Self::region_finalize(&mut layer_primitives, &mut current_region_vertices, &mut in_region);
+                                Self::region_finalize(
+                                    &mut layer_primitives,
+                                    &mut current_region_vertices,
+                                    &mut in_region,
+                                );
                                 // Start a new segment
                                 Self::region_begin(&mut current_region_vertices, &mut in_region);
                                 current_region_vertices.push(end);
@@ -1274,7 +1278,11 @@ impl GerberLayer {
         current_region_vertices.clear();
     }
 
-    fn region_finalize(layer_primitives: &mut Vec<GerberPrimitive>, current_region_vertices: &mut Vec<Point2<f64>>, in_region: &mut bool) {
+    fn region_finalize(
+        layer_primitives: &mut Vec<GerberPrimitive>,
+        current_region_vertices: &mut Vec<Point2<f64>>,
+        in_region: &mut bool,
+    ) {
         if *in_region && current_region_vertices.len() >= 3 {
             // Find bounding box
             let min_x = current_region_vertices
