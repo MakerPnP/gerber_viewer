@@ -84,22 +84,39 @@ The list of supported features will be improved as developer time permits, if yo
 | ✅         | Circle primitive                     |                                     |
 | ✅         | Concave and convex polygon primitive |                                     |
 | ✅         | Outline primitive                    |                                     |
-| ❌         | Thermal primitive                    |                                     |
 | ✅         | Linear plotting (G01)                |                                     |
 | ✅         | Circle apertures with holes          |                                     |
 | ✅         | Circular plotting (G02/G03)          | Currently only with circle aperture |
-| ❌         | Exposure                             | Currently only additive             |
 | ✅         | Step-repeat blocks (SR)              |                                     |
 | ✅         | Block aperture (AB)                  | Including nesting                   |
 
 ### Other UI/Rendering features
 
 | Supported | Feature                                    |
-|----------|--------------------------------------------|
-| ✅        | Rotation of layer with user-defined origin |
-| ✅        | Mirroring of layer                         |
-| ✅        | X/Y Offset of layer                        |
-| ✅        | Debug modes                                |
+|-----------|--------------------------------------------|
+| ✅         | Rotation of layer with user-defined origin |
+| ✅         | Mirroring of layer                         |
+| ✅         | X/Y Offset of layer                        |
+| ✅         | Debug modes                                |
+
+### Currently unupported gerber features
+
+| Supported | Feature                              | Notes                                   |
+|-----------|--------------------------------------|-----------------------------------------|
+| ❌         | Thermal primitive                    |                                         |
+| ❌         | Exposure                             | Currently only additive in the renderer |
+
+### Unsupported deprecated features
+
+| Supported | Feature                        | Notes                 |
+|-----------|--------------------------------|-----------------------|
+| ❌         | Single quadrant arc mode (G74) | Deprecated since 2021 |
+| ❌         | Image polarity (IP)            | Deprecated since 2013 |
+| ❌         | Image rotation (IR)            | Deprecated since 2012 |
+| ❌         | Load name (LN)                 | Deprecated since 2013 |
+| ❌         | Mirror image (MI)              | Deprecated since 2012 |
+| ❌         | Offset (OF)                    | Deprecated since 2012 |
+| ❌         | Scale factor (SF)              | Deprecated since 2012 |
 
 ### Other rendering limitations
 
