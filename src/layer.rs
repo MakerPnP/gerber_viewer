@@ -668,7 +668,7 @@ impl GerberLayer {
         debug!("aperture codes: {:?}", apertures.keys());
         info!("apertures: {:?}", apertures.len());
 
-        // Third pass: collect all primitives, handle regions and step-repeat blocks
+        // Third pass: collect all primitives, handle regions, aperture-block replay and step-repeat blocks
 
         let mut layer_primitives = Vec::new();
         let mut current_pos = Point2::new(0.0, 0.0);
@@ -698,6 +698,8 @@ impl GerberLayer {
             initial_position: Point2<f64>,
             initial_index: usize,
             initial_offset: Vector2<f64>,
+            initial_interpolation_mode: InterpolationMode,
+            initial_quadrant_mode: QuadrantMode,
         }
 
         let mut aperture_block_replay_stack: Vec<ApertureBlockReplayState> = vec![];
@@ -710,6 +712,8 @@ impl GerberLayer {
                     trace!("completed aperture block replay");
                     current_pos = state.initial_position;
                     aperture_block_offset = state.initial_offset;
+                    interpolation_mode = state.initial_interpolation_mode;
+                    quadrant_mode = state.initial_quadrant_mode;
 
                     // restore the current aperture to this one, since it may be re-used by the next flash command
                     // before another Dxx code is encountered.
@@ -1252,6 +1256,8 @@ impl GerberLayer {
                                                 initial_position: current_pos,
                                                 initial_index: index,
                                                 initial_offset: aperture_block_offset,
+                                                initial_interpolation_mode: interpolation_mode,
+                                                initial_quadrant_mode: quadrant_mode,
                                             };
                                             aperture_block_replay_stack.push(state);
 
