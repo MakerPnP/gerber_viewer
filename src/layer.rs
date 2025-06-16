@@ -720,7 +720,7 @@ impl GerberLayer {
                     current_pos = state.initial_position;
                     interpolation_mode = state.initial_interpolation_mode;
                     quadrant_mode = state.initial_quadrant_mode;
-                    
+
                     // furthermore, the statement in the spec "Gerber has no stack of graphics states" is misleading,
                     // since we have to reset the current aperture and restore the offset, both of which require
                     // a 'stack of graphic states'.
@@ -732,6 +732,10 @@ impl GerberLayer {
                     // skip the same command, otherwise we'd repeat forever
                     index = state.initial_index + 1;
                     aperture_block_replay_stack.pop();
+
+                    // in the case of nested blocks, we need to check again to see if we're ending the outer block, so
+                    // we `continue` here.
+                    continue;
                 }
             }
 
@@ -770,16 +774,16 @@ impl GerberLayer {
                     }
                 }
                 Command::ExtendedCode(ExtendedCode::ApertureBlock(ApertureBlock::Close)) => {
-                    // We can get here on an outer block in the case of nested blocked
+                    // this shouldn't happen, since the block range should cause this to be skipped
+                    // when the AP (open) is processed
+                    error!("AB (close) encountered during 3rd pass");
+
                     if !aperture_block_replay_stack.is_empty() {
                         trace!("AB (close) during replay");
                     } else {
                         // we're waiting for a block aperture to be selected
                     }
-
-                    // this shouldnt happen, since the block range should cause this to be skipped
-                    // when the AP (open) is processed
-                    error!("AB (close) encountered during 3rd pass");
+                    unreachable!()
                 }
                 Command::ExtendedCode(ExtendedCode::StepAndRepeat(StepAndRepeat::Open {
                     repeat_x,
