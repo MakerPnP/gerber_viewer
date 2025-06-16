@@ -1,8 +1,8 @@
 use egui::{Pos2, Rect, Response, Ui, Vec2};
 use log::trace;
-use nalgebra::{Point2, Vector2};
+use nalgebra::Point2;
 
-use crate::{BoundingBox, Invert, Mirroring, ToPos2, Transform2D};
+use crate::{BoundingBox, GerberTransform, Invert, ToPos2};
 
 #[derive(Debug, Default)]
 pub struct UiState {
@@ -109,19 +109,15 @@ impl ViewState {
     /// inputs, viewport of UI area to render.
     /// bounding box of all gerber layers to render.
     /// initial zoom factor, e.g. 0.5 for 50%.
-    /// center offset (in gerber coordinates), for rotation and mirroring. the vector from the design offset to the center.
-    /// design offset (in gerber coordinates), as per eda export settings. if export is 5,10, use -5,-10 to undo the offset.
-    /// rotation, in radians
-    /// mirroring
+    /// the initial transform.
+    ///
+    /// often you'll want to reset the `transform` before calling this.
     pub fn reset_view(
         &mut self,
         viewport: Rect,
         bbox: &BoundingBox,
         initial_zoom_factor: f32,
-        center_offset: Vector2<f64>,
-        design_offset: Vector2<f64>,
-        rotation_radians: f32,
-        mirroring: Mirroring,
+        transform: &GerberTransform,
     ) {
         let content_width = bbox.width();
         let content_height = bbox.height();
@@ -135,15 +131,6 @@ impl ViewState {
         let scale = scale * initial_zoom_factor;
         // adjust slightly to add a margin
         let scale = scale * 0.95;
-
-        // Create the same transform that will be used in update()
-        let origin = center_offset - design_offset;
-        let transform = Transform2D {
-            rotation_radians,
-            mirroring,
-            origin,
-            offset: design_offset,
-        };
 
         // Compute transformed bounding box
         let outline_vertices: Vec<_> = bbox

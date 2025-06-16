@@ -5,13 +5,12 @@ use egui::epaint::{
     Color32, ColorMode, FontId, Mesh, PathShape, PathStroke, Pos2, Rect, Shape, Stroke, StrokeKind, Vec2, Vertex,
 };
 use egui::Painter;
-use nalgebra::Vector2;
 
 use crate::layer::GerberPrimitive;
-use crate::{color, GerberLayer, Mirroring, ViewState};
+use crate::{color, GerberLayer, ViewState};
 use crate::{
-    ArcGerberPrimitive, CircleGerberPrimitive, LineGerberPrimitive, PolygonGerberPrimitive, RectangleGerberPrimitive,
-    Transform2D,
+    ArcGerberPrimitive, CircleGerberPrimitive, GerberTransform, LineGerberPrimitive, PolygonGerberPrimitive,
+    RectangleGerberPrimitive,
 };
 
 #[derive(Debug, Clone)]
@@ -46,25 +45,10 @@ impl GerberRenderer {
         layer: &GerberLayer,
         base_color: Color32,
         configuration: &RenderConfiguration,
-        // radians (positive=clockwise)
-        rotation: f32,
-        mirroring: Mirroring,
-        // in gerber coordinates
-        design_origin: Vector2<f64>,
-        // in gerber coordinates
-        design_offset: Vector2<f64>,
+        transform: &GerberTransform,
     ) {
-        let relative_origin = Vector2::new(design_origin.x, -design_origin.y);
-        let offset = Vector2::new(design_offset.x, -design_offset.y);
-
-        let origin = relative_origin - offset;
-
-        let transform = Transform2D {
-            rotation_radians: rotation,
-            mirroring,
-            origin,
-            offset,
-        };
+        // flip the transform Y axis, for screen coordinates
+        let transform = transform.flip_y();
 
         for (index, primitive) in layer.primitives().iter().enumerate() {
             let color = match configuration.use_unique_shape_colors {
@@ -79,19 +63,17 @@ impl GerberRenderer {
 
             match primitive {
                 GerberPrimitive::Circle(circle) => {
-                    circle.render(painter, &view, &transform, color, rotation, shape_number, configuration)
+                    circle.render(painter, &view, &transform, color, shape_number, configuration)
                 }
                 GerberPrimitive::Rectangle(rect) => {
-                    rect.render(painter, &view, &transform, color, rotation, shape_number, configuration)
+                    rect.render(painter, &view, &transform, color, shape_number, configuration)
                 }
                 GerberPrimitive::Line(line) => {
-                    line.render(painter, &view, &transform, color, rotation, shape_number, configuration)
+                    line.render(painter, &view, &transform, color, shape_number, configuration)
                 }
-                GerberPrimitive::Arc(arc) => {
-                    arc.render(painter, &view, &transform, color, rotation, shape_number, configuration)
-                }
+                GerberPrimitive::Arc(arc) => arc.render(painter, &view, &transform, color, shape_number, configuration),
                 GerberPrimitive::Polygon(polygon) => {
-                    polygon.render(painter, &view, &transform, color, rotation, shape_number, configuration)
+                    polygon.render(painter, &view, &transform, color, shape_number, configuration)
                 }
             }
         }
@@ -103,9 +85,8 @@ trait Renderable {
         &self,
         painter: &Painter,
         view: &ViewState,
-        transform: &Transform2D,
+        transform: &GerberTransform,
         color: Color32,
-        rotation: f32,
         shape_number: Option<usize>,
         configuration: &RenderConfiguration,
     );
@@ -117,9 +98,8 @@ impl Renderable for CircleGerberPrimitive {
         &self,
         painter: &Painter,
         view: &ViewState,
-        transform: &Transform2D,
+        transform: &GerberTransform,
         color: Color32,
-        _rotation: f32,
         shape_number: Option<usize>,
         _configuration: &RenderConfiguration,
     ) {
@@ -155,9 +135,8 @@ impl Renderable for RectangleGerberPrimitive {
         &self,
         painter: &Painter,
         view: &ViewState,
-        transform: &Transform2D,
+        transform: &GerberTransform,
         color: Color32,
-        rotation: f32,
         shape_number: Option<usize>,
         _configuration: &RenderConfiguration,
     ) {
@@ -177,7 +156,10 @@ impl Renderable for RectangleGerberPrimitive {
         );
         let center = (view.translation + transform.apply_to_pos2(screen_center) * view.scale).to_pos2();
 
-        let angle_normalized = rotation.to_degrees().rem_euclid(360.0);
+        let angle_normalized = transform
+            .rotation_radians
+            .to_degrees()
+            .rem_euclid(360.0);
         let is_axis_aligned = (angle_normalized - 0.0).abs() < f32::EPSILON
             || (angle_normalized - 90.0).abs() < f32::EPSILON
             || (angle_normalized - 180.0).abs() < f32::EPSILON
@@ -243,9 +225,8 @@ impl Renderable for LineGerberPrimitive {
         &self,
         painter: &Painter,
         view: &ViewState,
-        transform: &Transform2D,
+        transform: &GerberTransform,
         color: Color32,
-        _rotation: f32,
         shape_number: Option<usize>,
         _configuration: &RenderConfiguration,
     ) {
@@ -293,9 +274,8 @@ impl Renderable for ArcGerberPrimitive {
         &self,
         painter: &Painter,
         view: &ViewState,
-        transform: &Transform2D,
+        transform: &GerberTransform,
         color: Color32,
-        _rotation: f32,
         shape_number: Option<usize>,
         _configuration: &RenderConfiguration,
     ) {
@@ -352,9 +332,8 @@ impl Renderable for PolygonGerberPrimitive {
         &self,
         painter: &Painter,
         view: &ViewState,
-        transform: &Transform2D,
+        transform: &GerberTransform,
         color: Color32,
-        _rotation: f32,
         shape_number: Option<usize>,
         configuration: &RenderConfiguration,
     ) {
@@ -441,7 +420,7 @@ impl Renderable for PolygonGerberPrimitive {
 fn draw_shape_number(
     painter: &Painter,
     view: &ViewState,
-    transform: &Transform2D,
+    transform: &GerberTransform,
     position: ShapeNumberPosition,
     shape_number: Option<usize>,
 ) {
