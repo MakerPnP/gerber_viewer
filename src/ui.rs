@@ -1,9 +1,10 @@
 use egui::{Pos2, Rect, Response, Ui, Vec2};
 use gerber_types::Unit;
-use log::{trace, debug};
+use log::{debug, trace};
 use nalgebra::Point2;
 
-use crate::{BoundingBox, Invert, ToPos2};
+use crate::{Invert, ToPos2};
+use crate::geometry::BoundingBox;
 
 #[derive(Debug, Default)]
 pub struct UiState {

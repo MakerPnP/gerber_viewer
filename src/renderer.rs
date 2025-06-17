@@ -7,11 +7,12 @@ use egui::epaint::{
 use egui::Painter;
 use nalgebra::Matrix3;
 use crate::layer::GerberPrimitive;
-use crate::{color, GerberLayer, Matrix3Pos2Ext, Matrix3TransformExt, ViewState};
+use crate::{color, GerberLayer, ViewState};
 use crate::{
-    ArcGerberPrimitive, CircleGerberPrimitive, GerberTransform, LineGerberPrimitive, PolygonGerberPrimitive,
+    ArcGerberPrimitive, CircleGerberPrimitive, LineGerberPrimitive, PolygonGerberPrimitive,
     RectangleGerberPrimitive,
 };
+use crate::geometry::{GerberTransform, Matrix3Pos2Ext, Matrix3TransformExt};
 
 #[derive(Debug, Clone)]
 pub struct RenderConfiguration {

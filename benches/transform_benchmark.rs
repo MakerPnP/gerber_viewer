@@ -38,7 +38,7 @@ fn benchmark_transforms(c: &mut Criterion) {
     let num_points = 10000;
     let points = generate_random_points(num_points);
     let transform = TestTransform::new_random();
-    
+
     // Create a GerberTransform with similar properties
     let gerber_transform = GerberTransform {
         rotation_radians: transform.rotation as f32,
@@ -54,7 +54,7 @@ fn benchmark_transforms(c: &mut Criterion) {
 
     // Benchmark transform_point2
     group.bench_function("transform_point2", |b| {
-        
+
         b.iter(|| {
             for point in &points {
                 black_box(matrix.transform_point2(black_box(*point)));
@@ -78,7 +78,7 @@ fn benchmark_transforms(c: &mut Criterion) {
             }
         })
     });
-    
+
 
     group.finish();
 }

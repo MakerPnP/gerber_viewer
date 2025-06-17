@@ -5,7 +5,9 @@ use eframe::epaint::Color32;
 use egui::ViewportBuilder;
 use nalgebra::Vector2;
 use gerber_viewer::gerber_parser::parse;
-use gerber_viewer::{draw_arrow, draw_outline, draw_crosshair, BoundingBox, GerberLayer, GerberRenderer, GerberTransform, ViewState, draw_marker, UiState, ToPosition, RenderConfiguration};
+use gerber_viewer::{draw_arrow, draw_crosshair, draw_marker, draw_outline, GerberLayer, GerberRenderer, RenderConfiguration, ToPosition, UiState, ViewState};
+use gerber_viewer::BoundingBox;
+use gerber_viewer::GerberTransform;
 
 const ENABLE_UNIQUE_SHAPE_COLORS: bool = true;
 const ENABLE_VERTEX_NUMBERING: bool = false;

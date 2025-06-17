@@ -5,12 +5,12 @@ use std::sync::Arc;
 use gerber_types::{ApertureBlock, Circle, InterpolationMode, QuadrantMode, StepAndRepeat};
 use log::{debug, error, info, trace, warn};
 use nalgebra::{Point2, Vector2};
-
+use crate::geometry::BoundingBox;
+use crate::geometry::PolygonMesh;
 use super::expressions::{
     evaluate_expression, macro_boolean_to_bool, macro_decimal_pair_to_f64, macro_decimal_to_f64, macro_integer_to_u32,
     ExpressionEvaluationError, MacroContext,
 };
-use super::geometry::{BoundingBox, PolygonMesh};
 use super::gerber_types::{
     Aperture, ApertureDefinition, ApertureMacro, Command, Coordinates, DCode, ExtendedCode, FunctionCode, GCode,
     MacroContent, MacroDecimal, Operation, VariableDefinition,
