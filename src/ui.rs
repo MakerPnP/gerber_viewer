@@ -115,13 +115,7 @@ impl ViewState {
     /// the initial transform.
     ///
     /// often you'll want to reset the `transform` before calling this.
-    pub fn fit_view(
-        &mut self,
-        viewport: Rect,
-        bbox: &BoundingBox,
-        initial_zoom_factor: f32,
-        transform: &GerberTransform,
-    ) {
+    pub fn fit_view(&mut self, viewport: Rect, bbox: &BoundingBox, initial_zoom_factor: f32) {
         let content_width = bbox.width();
         let content_height = bbox.height();
 
@@ -139,18 +133,15 @@ impl ViewState {
         );
         self.scale = scale;
 
-        self.center_view(viewport, bbox, transform);
+        self.center_view(viewport, bbox);
     }
 
-    pub fn center_view(&mut self, viewport: Rect, bbox: &BoundingBox, transform: &GerberTransform) {
-        let transformed_bbox = bbox.apply_transform(transform);
-
-        // Use the center of the transformed bounding box
-        let transformed_center = transformed_bbox.center();
+    pub fn center_view(&mut self, viewport: Rect, bbox: &BoundingBox) {
+        let center = bbox.center();
 
         self.translation = Vec2::new(
-            viewport.center().x - (transformed_center.x as f32 * self.scale),
-            viewport.center().y + (transformed_center.y as f32 * self.scale),
+            viewport.center().x - (center.x as f32 * self.scale),
+            viewport.center().y + (center.y as f32 * self.scale),
         );
     }
 
