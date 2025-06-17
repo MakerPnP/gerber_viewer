@@ -132,14 +132,7 @@ impl ViewState {
 
         let scale = self.base_scale * initial_zoom_factor;
 
-        // Compute transformed bounding box
-        let outline_vertices: Vec<_> = bbox
-            .vertices()
-            .into_iter()
-            .map(|v| transform.apply_to_position(v))
-            .collect();
-
-        let transformed_bbox = BoundingBox::from_points(&outline_vertices);
+        let transformed_bbox = bbox.apply_transform(transform);
 
         // Use the center of the transformed bounding box
         let transformed_center = transformed_bbox.center();

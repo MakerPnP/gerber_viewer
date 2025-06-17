@@ -140,7 +140,7 @@ pub struct BoundingBox {
 
 impl BoundingBox {
     /// Use to generate an outline of the bbox
-    pub fn transform_vertices(&self, transform: GerberTransform) -> Vec<Point2<f64>> {
+    pub fn transform_vertices(&self, transform: &GerberTransform) -> Vec<Point2<f64>> {
         self.vertices()
             .into_iter()
             .map(|v| transform.apply_to_position(v))
@@ -180,7 +180,7 @@ impl BoundingBox {
         self.max.y - self.min.y
     }
 
-    pub fn apply_transform(&self, transform: GerberTransform) -> Self {
+    pub fn apply_transform(&self, transform: &GerberTransform) -> Self {
         // Step 1: Transform each corner of the original bbox
         let transformed_bbox_vertices: Vec<_> = self
             .vertices()
