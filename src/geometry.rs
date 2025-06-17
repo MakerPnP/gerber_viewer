@@ -81,6 +81,7 @@ impl Default for GerberTransform {
 
 impl GerberTransform {
     /// Apply the transform to a logical `Point2` (Gerber-space)
+    #[inline]
     pub fn apply_to_position(&self, pos: Point2<f64>) -> Point2<f64> {
         let mut x = pos.x - self.origin.x;
         let mut y = pos.y - self.origin.y;
@@ -104,6 +105,7 @@ impl GerberTransform {
     }
 
     /// Apply transform to a Vec2 instead of Point2 (used for bbox drawing)
+    #[inline]
     pub fn apply_to_pos2(&self, pos: Pos2) -> Vec2 {
         let mut x = pos.x as f64 - self.origin.x;
         let mut y = pos.y as f64 - self.origin.y;
