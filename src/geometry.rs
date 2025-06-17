@@ -1,6 +1,6 @@
 use egui::{Pos2, Vec2, Vec2b};
 use log::debug;
-use nalgebra::{Point2, Vector2};
+use nalgebra::{Matrix3, Point2, Vector2, Vector3};
 
 #[derive(Debug, Copy, Clone)]
 pub struct Mirroring {
@@ -79,50 +79,50 @@ impl Default for GerberTransform {
 
 impl GerberTransform {
     /// Apply the transform to a logical `Point2` (Gerber-space)
-    pub fn apply_to_position(&self, pos: Point2<f64>) -> Point2<f64> {
-        let mut x = pos.x - self.origin.x;
-        let mut y = pos.y - self.origin.y;
-
-        if self.mirroring.x {
-            x = -x;
-        }
-        if self.mirroring.y {
-            y = -y;
-        }
-
-        // Point2 are in GERBER coordinates, Positive Y = UP so we do a normal rotation
-        let (sin_theta, cos_theta) = (-self.rotation_radians as f64).sin_cos();
-        let rotated_x = x * cos_theta + y * sin_theta;
-        let rotated_y = -x * sin_theta + y * cos_theta;
-
-        Point2::new(
-            rotated_x * self.scale + self.origin.x + self.offset.x,
-            rotated_y * self.scale + self.origin.y + self.offset.y,
-        )
-    }
-
-    /// Apply transform to a Vec2 instead of Point2 (used for bbox drawing)
-    pub fn apply_to_pos2(&self, pos: Pos2) -> Vec2 {
-        let mut x = pos.x as f64 - self.origin.x;
-        let mut y = pos.y as f64 - self.origin.y;
-
-        if self.mirroring.x {
-            x = -x;
-        }
-        if self.mirroring.y {
-            y = -y;
-        }
-
-        // Pos 2 are in SCREEN coordinates, Positive Y = DOWN so we need to invert the rotation
-        let (sin_theta, cos_theta) = (-self.rotation_radians as f64).sin_cos();
-        let rotated_x = x * cos_theta - y * sin_theta;
-        let rotated_y = x * sin_theta + y * cos_theta;
-
-        Vec2::new(
-            (rotated_x * self.scale + self.origin.x + self.offset.x) as f32,
-            (rotated_y * self.scale + self.origin.y + self.offset.y) as f32,
-        )
-    }
+    // pub fn apply_to_position(&self, pos: Point2<f64>) -> Point2<f64> {
+    //     let mut x = pos.x - self.origin.x;
+    //     let mut y = pos.y - self.origin.y;
+    //
+    //     if self.mirroring.x {
+    //         x = -x;
+    //     }
+    //     if self.mirroring.y {
+    //         y = -y;
+    //     }
+    //
+    //     // Point2 are in GERBER coordinates, Positive Y = UP so we do a normal rotation
+    //     let (sin_theta, cos_theta) = (-self.rotation_radians as f64).sin_cos();
+    //     let rotated_x = x * cos_theta + y * sin_theta;
+    //     let rotated_y = -x * sin_theta + y * cos_theta;
+    //
+    //     Point2::new(
+    //         rotated_x * self.scale + self.origin.x + self.offset.x,
+    //         rotated_y * self.scale + self.origin.y + self.offset.y,
+    //     )
+    // }
+    //
+    // /// Apply transform to a Vec2 instead of Point2 (used for bbox drawing)
+    // pub fn apply_to_pos2(&self, pos: Pos2) -> Vec2 {
+    //     let mut x = pos.x as f64 - self.origin.x;
+    //     let mut y = pos.y as f64 - self.origin.y;
+    //
+    //     if self.mirroring.x {
+    //         x = -x;
+    //     }
+    //     if self.mirroring.y {
+    //         y = -y;
+    //     }
+    //
+    //     // Pos 2 are in SCREEN coordinates, Positive Y = DOWN so we need to invert the rotation
+    //     let (sin_theta, cos_theta) = (-self.rotation_radians as f64).sin_cos();
+    //     let rotated_x = x * cos_theta - y * sin_theta;
+    //     let rotated_y = x * sin_theta + y * cos_theta;
+    //
+    //     Vec2::new(
+    //         (rotated_x * self.scale + self.origin.x + self.offset.x) as f32,
+    //         (rotated_y * self.scale + self.origin.y + self.offset.y) as f32,
+    //     )
+    // }
 
     pub fn flip_y(mut self) -> Self {
         self.offset.y = -self.offset.y;
@@ -410,5 +410,750 @@ pub fn tessellate_polygon(vertices: &[Point2<f64>]) -> PolygonMesh {
     PolygonMesh {
         vertices: geometry.vertices,
         indices: geometry.indices,
+    }
+}
+
+impl GerberTransform {
+    /// Converts this transform to a 3x3 homogeneous transformation matrix
+    pub fn to_matrix(&self) -> Matrix3<f64> {
+        // Step 1: Translate by -origin
+        let translate_neg_origin = Matrix3::new(1.0, 0.0, -self.origin.x, 0.0, 1.0, -self.origin.y, 0.0, 0.0, 1.0);
+
+        // Step 2: Apply rotation
+        let rad = self.rotation_radians as f64;
+        let cos_rad = rad.cos();
+        let sin_rad = rad.sin();
+        let rotation_matrix = Matrix3::new(cos_rad, -sin_rad, 0.0, sin_rad, cos_rad, 0.0, 0.0, 0.0, 1.0);
+
+        // Step 3: Apply mirroring (if any)
+        let mirror_x = if self.mirroring.x { -1.0 } else { 1.0 };
+        let mirror_y = if self.mirroring.y { -1.0 } else { 1.0 };
+        let mirroring_matrix = Matrix3::new(mirror_x, 0.0, 0.0, 0.0, mirror_y, 0.0, 0.0, 0.0, 1.0);
+
+        // Step 4: Apply scaling
+        let scaling_matrix = Matrix3::new(self.scale, 0.0, 0.0, 0.0, self.scale, 0.0, 0.0, 0.0, 1.0);
+
+        // Step 5: Translate back by origin
+        let translate_origin = Matrix3::new(1.0, 0.0, self.origin.x, 0.0, 1.0, self.origin.y, 0.0, 0.0, 1.0);
+
+        // Step 6: Apply offset
+        let translate_offset = Matrix3::new(1.0, 0.0, self.offset.x, 0.0, 1.0, self.offset.y, 0.0, 0.0, 1.0);
+
+        // Combine all matrices: translate_offset * translate_origin * scaling * rotation * mirroring * translate_neg_origin
+        translate_offset * translate_origin * scaling_matrix * rotation_matrix * mirroring_matrix * translate_neg_origin
+    }
+
+    /// Creates a combined transform by multiplying the matrices of two transforms
+    pub fn combine(&self, other: &GerberTransform) -> Self {
+        // Get the matrices for both transforms
+        let matrix1 = self.to_matrix();
+        let matrix2 = other.to_matrix();
+
+        // Multiply the matrices (order matters: self is applied first, then other)
+        let combined_matrix = matrix2 * matrix1;
+
+        // Extract transform parameters from the combined matrix
+        Self::from_matrix(&combined_matrix)
+    }
+
+    /// Extract transform parameters from a matrix
+    pub fn from_matrix(matrix: &Matrix3<f64>) -> Self {
+        // Extract translation components (offset)
+        let offset = Vector2::new(matrix[(0, 2)], matrix[(1, 2)]);
+
+        // Extract the 2x2 transformation part
+        let a = matrix[(0, 0)];
+        let b = matrix[(0, 1)];
+        let c = matrix[(1, 0)];
+        let d = matrix[(1, 1)];
+
+        // Determine if there's mirroring by checking the determinant
+        let det = a * d - b * c;
+        let mirroring_x = det < 0.0;
+        let mirroring_y = false; // We'll only use x-mirroring for simplicity
+
+        // Calculate scale (average of scaling in x and y directions)
+        let scale_x = (a * a + c * c).sqrt();
+        let scale_y = (b * b + d * d).sqrt();
+        let scale = (scale_x + scale_y) / 2.0;
+
+        // Calculate rotation
+        // If det < 0, we have mirroring, so adjust the calculation
+        let mut rotation_radians = if !mirroring_x { c.atan2(a) } else { (-c).atan2(-a) } as f32;
+
+        // Use (0,0) as the origin for the combined transform
+        // This is because we've already incorporated the original origins
+        // into the combined matrix
+        Self {
+            rotation_radians,
+            mirroring: Mirroring {
+                x: mirroring_x,
+                y: mirroring_y,
+            },
+            origin: Vector2::new(0.0, 0.0),
+            offset,
+            scale,
+        }
+    }
+
+    /// Applies this transform to a position
+    pub fn apply_to_position(&self, position: Point2<f64>) -> Point2<f64> {
+        // Convert to homogeneous coordinates
+        let point_vec = Vector3::new(position.x, position.y, 1.0);
+
+        // Apply the transformation matrix
+        let matrix = self.to_matrix();
+        let transformed = matrix * point_vec;
+
+        // Convert back from homogeneous coordinates
+        Point2::new(transformed[0], transformed[1])
+    }
+
+    /// Apply transform to a Pos2 instead of Point2 (used for bbox drawing)
+    pub fn apply_to_pos2(&self, pos: Pos2) -> Vec2 {
+        // Convert from Pos2 (screen coords) to our matrix coordinate system
+        // Note: Screen coordinates have positive Y pointing DOWN, so we need to adjust the rotation
+
+        // Create a transform that has the rotation direction inverted
+        let mut screen_transform = self.clone();
+        screen_transform.rotation_radians = -self.rotation_radians;
+
+        // Get the transformation matrix
+        let matrix = screen_transform.to_matrix();
+
+        // Convert Pos2 to homogeneous coordinates
+        let point_vec = nalgebra::Vector3::new(pos.x as f64, pos.y as f64, 1.0);
+
+        // Apply the transformation matrix
+        let transformed = matrix * point_vec;
+
+        // Convert back to Vec2
+        Vec2::new(transformed[0] as f32, transformed[1] as f32)
+    }
+}
+
+#[cfg(test)]
+mod transform_tests {
+    use std::f32::consts::PI;
+    use std::f64::consts::PI as PI64;
+
+    use nalgebra::{Point2, Vector2};
+
+    use super::*;
+
+    #[test]
+    fn test_identity_transform_matrix() {
+        let identity = GerberTransform {
+            rotation_radians: 0.0,
+            mirroring: Mirroring::default(),
+            origin: Vector2::new(0.0, 0.0),
+            offset: Vector2::new(0.0, 0.0),
+            scale: 1.0,
+        };
+
+        let matrix = identity.to_matrix();
+        // Identity matrix should be close to:
+        // [1 0 0]
+        // [0 1 0]
+        // [0 0 1]
+        assert!((matrix[(0, 0)] - 1.0).abs() < 1e-6);
+        assert!((matrix[(0, 1)] - 0.0).abs() < 1e-6);
+        assert!((matrix[(0, 2)] - 0.0).abs() < 1e-6);
+        assert!((matrix[(1, 0)] - 0.0).abs() < 1e-6);
+        assert!((matrix[(1, 1)] - 1.0).abs() < 1e-6);
+        assert!((matrix[(1, 2)] - 0.0).abs() < 1e-6);
+        assert!((matrix[(2, 0)] - 0.0).abs() < 1e-6);
+        assert!((matrix[(2, 1)] - 0.0).abs() < 1e-6);
+        assert!((matrix[(2, 2)] - 1.0).abs() < 1e-6);
+
+        // Converting back should give us the same transform
+        let reconstructed = GerberTransform::from_matrix(&matrix);
+        assert!((reconstructed.rotation_radians - 0.0).abs() < 1e-6);
+        assert_eq!(reconstructed.mirroring.x, false);
+        assert_eq!(reconstructed.mirroring.y, false);
+        assert!((reconstructed.origin.x - 0.0).abs() < 1e-6);
+        assert!((reconstructed.origin.y - 0.0).abs() < 1e-6);
+        assert!((reconstructed.offset.x - 0.0).abs() < 1e-6);
+        assert!((reconstructed.offset.y - 0.0).abs() < 1e-6);
+        assert!((reconstructed.scale - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_rotation_transform_matrix() {
+        let rotation_90 = GerberTransform {
+            rotation_radians: PI / 2.0, // 90 degrees
+            mirroring: Mirroring::default(),
+            origin: Vector2::new(0.0, 0.0),
+            offset: Vector2::new(0.0, 0.0),
+            scale: 1.0,
+        };
+
+        let matrix = rotation_90.to_matrix();
+        // 90 degree rotation matrix should be close to:
+        // [0 -1 0]
+        // [1  0 0]
+        // [0  0 1]
+        assert!((matrix[(0, 0)] - 0.0).abs() < 1e-6);
+        assert!((matrix[(0, 1)] - -1.0).abs() < 1e-6);
+        assert!((matrix[(0, 2)] - 0.0).abs() < 1e-6);
+        assert!((matrix[(1, 0)] - 1.0).abs() < 1e-6);
+        assert!((matrix[(1, 1)] - 0.0).abs() < 1e-6);
+        assert!((matrix[(1, 2)] - 0.0).abs() < 1e-6);
+
+        // Converting back should give us the same transform
+        let reconstructed = GerberTransform::from_matrix(&matrix);
+        assert!((reconstructed.rotation_radians - PI / 2.0).abs() < 1e-6);
+        assert_eq!(reconstructed.mirroring.x, false);
+        assert!((reconstructed.scale - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_offset_transform_matrix() {
+        let offset_transform = GerberTransform {
+            rotation_radians: 0.0,
+            mirroring: Mirroring::default(),
+            origin: Vector2::new(0.0, 0.0),
+            offset: Vector2::new(10.0, 20.0),
+            scale: 1.0,
+        };
+
+        let matrix = offset_transform.to_matrix();
+        // Translation matrix should be close to:
+        // [1 0 10]
+        // [0 1 20]
+        // [0 0  1]
+        assert!((matrix[(0, 0)] - 1.0).abs() < 1e-6);
+        assert!((matrix[(0, 1)] - 0.0).abs() < 1e-6);
+        assert!((matrix[(0, 2)] - 10.0).abs() < 1e-6);
+        assert!((matrix[(1, 0)] - 0.0).abs() < 1e-6);
+        assert!((matrix[(1, 1)] - 1.0).abs() < 1e-6);
+        assert!((matrix[(1, 2)] - 20.0).abs() < 1e-6);
+
+        // Converting back should give us the same transform
+        let reconstructed = GerberTransform::from_matrix(&matrix);
+        assert!((reconstructed.rotation_radians - 0.0).abs() < 1e-6);
+        assert_eq!(reconstructed.mirroring.x, false);
+        assert!((reconstructed.offset.x - 10.0).abs() < 1e-6);
+        assert!((reconstructed.offset.y - 20.0).abs() < 1e-6);
+        assert!((reconstructed.scale - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_combined_transforms_example() {
+        // Box 1 at (-5, 0)
+        let box1_position = Point2::new(-5.0, 0.0);
+
+        // Box 2 at (5, 0)
+        let box2_position = Point2::new(5.0, 0.0);
+
+        // Step 1: Create individual 45-degree rotation transforms for each box
+        let transform1 = GerberTransform {
+            rotation_radians: PI / 4.0, // 45 degrees
+            mirroring: Mirroring::default(),
+            origin: Vector2::new(-5.0, 0.0), // Rotate around box1's position
+            offset: Vector2::new(0.0, 0.0),
+            scale: 1.0,
+        };
+
+        let transform2 = GerberTransform {
+            rotation_radians: PI / 4.0, // 45 degrees
+            mirroring: Mirroring::default(),
+            origin: Vector2::new(5.0, 0.0), // Rotate around box2's position
+            offset: Vector2::new(0.0, 0.0),
+            scale: 1.0,
+        };
+
+        // Step 2: Create a 90-degree rotation transform around (0, 0) for both boxes
+        let transform_both = GerberTransform {
+            rotation_radians: PI / 2.0, // 90 degrees
+            mirroring: Mirroring::default(),
+            origin: Vector2::new(0.0, 0.0), // Rotate around the origin
+            offset: Vector2::new(0.0, 0.0),
+            scale: 1.0,
+        };
+
+        // Apply transforms to get reference results
+        let box1_transform1 = transform1.apply_to_position(box1_position);
+        println!("box1_transform1: {:?}", [box1_transform1.x, box1_transform1.y]);
+
+        let box2_transform2 = transform2.apply_to_position(box2_position);
+        println!("box2_transform2: {:?}", [box2_transform2.x, box2_transform2.y]);
+
+        let box1_final_reference = transform_both.apply_to_position(box1_transform1);
+        println!("box1_final_reference: {:?}", [
+            box1_final_reference.x,
+            box1_final_reference.y
+        ]);
+
+        let box2_final_reference = transform_both.apply_to_position(box2_transform2);
+        println!("box2_final_reference: {:?}", [
+            box2_final_reference.x,
+            box2_final_reference.y
+        ]);
+
+        // Create combined transforms using the new matrix-based approach
+        let combined1_matrix = transform1.combine(&transform_both);
+        let combined2_matrix = transform2.combine(&transform_both);
+
+        // Apply the combined transforms
+        let box1_final_matrix = combined1_matrix.apply_to_position(box1_position);
+        println!("box1_final_matrix: {:?}", [box1_final_matrix.x, box1_final_matrix.y]);
+
+        let box2_final_matrix = combined2_matrix.apply_to_position(box2_position);
+        println!("box2_final_matrix: {:?}", [box2_final_matrix.x, box2_final_matrix.y]);
+
+        // Print the combined transforms for debugging
+        println!(
+            "combined1_matrix: rotation={}, offset={:?}, origin={:?}, scale={}",
+            combined1_matrix.rotation_radians,
+            [combined1_matrix.offset.x, combined1_matrix.offset.y],
+            [combined1_matrix.origin.x, combined1_matrix.origin.y],
+            combined1_matrix.scale
+        );
+
+        println!(
+            "combined2_matrix: rotation={}, offset={:?}, origin={:?}, scale={}",
+            combined2_matrix.rotation_radians,
+            [combined2_matrix.offset.x, combined2_matrix.offset.y],
+            [combined2_matrix.origin.x, combined2_matrix.origin.y],
+            combined2_matrix.scale
+        );
+
+        // Verify that matrix-combined transforms produce correct results
+        assert!((box1_final_matrix.x - box1_final_reference.x).abs() < 1e-6);
+        assert!((box1_final_matrix.y - box1_final_reference.y).abs() < 1e-6);
+
+        assert!((box2_final_matrix.x - box2_final_reference.x).abs() < 1e-6);
+        assert!((box2_final_matrix.y - box2_final_reference.y).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_two_boxes_with_rotation() {
+        // Box positions
+        let box1_position = Point2::new(-5.0, -5.0);
+        let box2_position = Point2::new(-5.0, 5.0);
+
+        // Step 1: Create individual 45-degree rotation transforms for each box
+        let transform1 = GerberTransform {
+            rotation_radians: PI / 4.0, // 45 degrees
+            mirroring: Mirroring::default(),
+            origin: Vector2::new(-5.0, -5.0), // Rotate around box1's position
+            offset: Vector2::new(0.0, 0.0),
+            scale: 1.0,
+        };
+
+        let transform2 = GerberTransform {
+            rotation_radians: PI / 4.0, // 45 degrees
+            mirroring: Mirroring::default(),
+            origin: Vector2::new(-5.0, 5.0), // Rotate around box2's position
+            offset: Vector2::new(0.0, 0.0),
+            scale: 1.0,
+        };
+
+        // Step 2: Create a 90-degree rotation transform around (0, 0) for both boxes
+        let transform_both = GerberTransform {
+            rotation_radians: PI / 2.0, // 90 degrees
+            mirroring: Mirroring::default(),
+            origin: Vector2::new(0.0, 0.0), // Rotate around the origin
+            offset: Vector2::new(0.0, 0.0),
+            scale: 1.0,
+        };
+
+        // Apply transforms sequentially to get reference results
+        let box1_after_local = transform1.apply_to_position(box1_position);
+        println!(
+            "Box1 after local rotation: ({:.2}, {:.2})",
+            box1_after_local.x, box1_after_local.y
+        );
+
+        let box2_after_local = transform2.apply_to_position(box2_position);
+        println!(
+            "Box2 after local rotation: ({:.2}, {:.2})",
+            box2_after_local.x, box2_after_local.y
+        );
+
+        let box1_final_reference = transform_both.apply_to_position(box1_after_local);
+        println!(
+            "Box1 final position (sequential): ({:.2}, {:.2})",
+            box1_final_reference.x, box1_final_reference.y
+        );
+
+        let box2_final_reference = transform_both.apply_to_position(box2_after_local);
+        println!(
+            "Box2 final position (sequential): ({:.2}, {:.2})",
+            box2_final_reference.x, box2_final_reference.y
+        );
+
+        // Create combined transforms using matrix-based approach
+        let combined1 = transform1.combine(&transform_both);
+        let combined2 = transform2.combine(&transform_both);
+
+        // Apply the combined transforms
+        let box1_final_combined = combined1.apply_to_position(box1_position);
+        println!(
+            "Box1 final position (combined): ({:.2}, {:.2})",
+            box1_final_combined.x, box1_final_combined.y
+        );
+
+        let box2_final_combined = combined2.apply_to_position(box2_position);
+        println!(
+            "Box2 final position (combined): ({:.2}, {:.2})",
+            box2_final_combined.x, box2_final_combined.y
+        );
+
+        // Print the combined transforms for debugging
+        println!("Combined transform for Box1: rotation={:.2} degrees, offset=({:.2}, {:.2}), origin=({:.2}, {:.2}), scale={:.2}",
+                 combined1.rotation_radians * 180.0 / PI as f32,
+                 combined1.offset.x, combined1.offset.y,
+                 combined1.origin.x, combined1.origin.y,
+                 combined1.scale);
+
+        println!("Combined transform for Box2: rotation={:.2} degrees, offset=({:.2}, {:.2}), origin=({:.2}, {:.2}), scale={:.2}",
+                 combined2.rotation_radians * 180.0 / PI as f32,
+                 combined2.offset.x, combined2.offset.y,
+                 combined2.origin.x, combined2.origin.y,
+                 combined2.scale);
+
+        // Verify that the boxes end up at the expected positions
+        assert!((box1_final_reference.x - 5.0).abs() < 1e-6);
+        assert!((box1_final_reference.y + 5.0).abs() < 1e-6); // -5.0
+
+        assert!((box2_final_reference.x + 5.0).abs() < 1e-6); // -5.0
+        assert!((box2_final_reference.y + 5.0).abs() < 1e-6); // -5.0
+
+        // Verify that combined transforms produce the same results as sequential application
+        assert!((box1_final_combined.x - box1_final_reference.x).abs() < 1e-6);
+        assert!((box1_final_combined.y - box1_final_reference.y).abs() < 1e-6);
+
+        assert!((box2_final_combined.x - box2_final_reference.x).abs() < 1e-6);
+        assert!((box2_final_combined.y - box2_final_reference.y).abs() < 1e-6);
+
+        // Add test points around each box to visualize the rotation
+        let test_points1 = [
+            Point2::new(-6.0, -5.0), // Left of box1
+            Point2::new(-5.0, -6.0), // Below box1
+            Point2::new(-4.0, -5.0), // Right of box1
+            Point2::new(-5.0, -4.0), // Above box1
+        ];
+
+        let test_points2 = [
+            Point2::new(-6.0, 5.0), // Left of box2
+            Point2::new(-5.0, 6.0), // Above box2
+            Point2::new(-4.0, 5.0), // Right of box2
+            Point2::new(-5.0, 4.0), // Below box2
+        ];
+
+        println!("\nBox1 test points:");
+        for (i, point) in test_points1.iter().enumerate() {
+            let after_local = transform1.apply_to_position(*point);
+            let final_pos = transform_both.apply_to_position(after_local);
+            let combined_pos = combined1.apply_to_position(*point);
+
+            println!(
+                "Point {}: Original=({:.2}, {:.2}), Final=({:.2}, {:.2}), Combined=({:.2}, {:.2})",
+                i + 1,
+                point.x,
+                point.y,
+                final_pos.x,
+                final_pos.y,
+                combined_pos.x,
+                combined_pos.y
+            );
+
+            // Verify combined transform gives same result
+            assert!((final_pos.x - combined_pos.x).abs() < 1e-6);
+            assert!((final_pos.y - combined_pos.y).abs() < 1e-6);
+        }
+
+        println!("\nBox2 test points:");
+        for (i, point) in test_points2.iter().enumerate() {
+            let after_local = transform2.apply_to_position(*point);
+            let final_pos = transform_both.apply_to_position(after_local);
+            let combined_pos = combined2.apply_to_position(*point);
+
+            println!(
+                "Point {}: Original=({:.2}, {:.2}), Final=({:.2}, {:.2}), Combined=({:.2}, {:.2})",
+                i + 1,
+                point.x,
+                point.y,
+                final_pos.x,
+                final_pos.y,
+                combined_pos.x,
+                combined_pos.y
+            );
+
+            // Verify combined transform gives same result
+            assert!((final_pos.x - combined_pos.x).abs() < 1e-6);
+            assert!((final_pos.y - combined_pos.y).abs() < 1e-6);
+        }
+
+        // Final verification after all transformations
+        // After local rotation and global rotation, box1 should be at (5, -5)
+        // After local rotation and global rotation, box2 should be at (-5, -5)
+        assert!((box1_final_reference.x - 5.0).abs() < 1e-6);
+        assert!((box1_final_reference.y + 5.0).abs() < 1e-6); // -5.0
+
+        assert!((box2_final_reference.x + 5.0).abs() < 1e-6); // -5.0
+        assert!((box2_final_reference.y + 5.0).abs() < 1e-6); // -5.0
+    }
+
+    #[test]
+    fn test_combined_transforms_complex() {
+        // Test a more complex scenario with rotation, scaling, and offset
+        let transform1 = GerberTransform {
+            rotation_radians: PI / 6.0, // 30 degrees
+            mirroring: Mirroring::default(),
+            origin: Vector2::new(3.0, 4.0),
+            offset: Vector2::new(1.0, 2.0),
+            scale: 1.5,
+        };
+
+        let transform2 = GerberTransform {
+            rotation_radians: PI / 3.0, // 60 degrees
+            mirroring: Mirroring::default(),
+            origin: Vector2::new(-2.0, 5.0),
+            offset: Vector2::new(3.0, -1.0),
+            scale: 0.8,
+        };
+
+        // Test points
+        let test_points = vec![
+            Point2::new(0.0, 0.0),
+            Point2::new(10.0, 0.0),
+            Point2::new(0.0, 10.0),
+            Point2::new(-5.0, -5.0),
+        ];
+
+        for point in test_points {
+            // Apply transforms sequentially
+            let intermediate = transform1.apply_to_position(point);
+            let final_reference = transform2.apply_to_position(intermediate);
+
+            // Apply combined transform
+            let combined = transform1.combine(&transform2);
+            let final_combined = combined.apply_to_position(point);
+
+            // Verify results match
+            assert!((final_combined.x - final_reference.x).abs() < 1e-6);
+            assert!((final_combined.y - final_reference.y).abs() < 1e-6);
+        }
+    }
+
+    #[test]
+    fn test_mirroring_transforms() {
+        // Create transform with x-mirroring
+        let mirror_x = GerberTransform {
+            rotation_radians: 0.0,
+            mirroring: Mirroring {
+                x: true,
+                y: false,
+            },
+            origin: Vector2::new(0.0, 0.0),
+            offset: Vector2::new(0.0, 0.0),
+            scale: 1.0,
+        };
+
+        // Create a rotation transform
+        let rotate_45 = GerberTransform {
+            rotation_radians: PI / 4.0, // 45 degrees
+            mirroring: Mirroring::default(),
+            origin: Vector2::new(0.0, 0.0),
+            offset: Vector2::new(0.0, 0.0),
+            scale: 1.0,
+        };
+
+        // Test point
+        let point = Point2::new(3.0, 4.0);
+
+        // Apply transforms sequentially
+        let intermediate = mirror_x.apply_to_position(point);
+        let final_reference = rotate_45.apply_to_position(intermediate);
+
+        // Apply combined transform
+        let combined = mirror_x.combine(&rotate_45);
+        let final_combined = combined.apply_to_position(point);
+
+        // Verify results match
+        assert!((final_combined.x - final_reference.x).abs() < 1e-6);
+        assert!((final_combined.y - final_reference.y).abs() < 1e-6);
+
+        // Verify mirroring was detected in the combined transform
+        assert_eq!(combined.mirroring.x, true);
+    }
+
+    #[test]
+    fn test_scaling_transforms() {
+        // Create transform with scaling
+        let scale_2x = GerberTransform {
+            rotation_radians: 0.0,
+            mirroring: Mirroring::default(),
+            origin: Vector2::new(0.0, 0.0),
+            offset: Vector2::new(0.0, 0.0),
+            scale: 2.0,
+        };
+
+        // Create transform with offset
+        let offset_10_20 = GerberTransform {
+            rotation_radians: 0.0,
+            mirroring: Mirroring::default(),
+            origin: Vector2::new(0.0, 0.0),
+            offset: Vector2::new(10.0, 20.0),
+            scale: 1.0,
+        };
+
+        // Test point
+        let point = Point2::new(3.0, 4.0);
+
+        // Apply transforms sequentially
+        let intermediate = scale_2x.apply_to_position(point);
+        let final_reference = offset_10_20.apply_to_position(intermediate);
+
+        // Apply combined transform
+        let combined = scale_2x.combine(&offset_10_20);
+        let final_combined = combined.apply_to_position(point);
+
+        // Verify results match
+        assert!((final_combined.x - final_reference.x).abs() < 1e-6);
+        assert!((final_combined.y - final_reference.y).abs() < 1e-6);
+
+        // Verify scaling was preserved in the combined transform
+        assert!((combined.scale - 2.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_multiple_combined_transforms() {
+        // Create three transforms
+        let transform1 = GerberTransform {
+            rotation_radians: PI / 4.0, // 45 degrees
+            mirroring: Mirroring::default(),
+            origin: Vector2::new(-5.0, 0.0),
+            offset: Vector2::new(0.0, 0.0),
+            scale: 1.0,
+        };
+
+        let transform2 = GerberTransform {
+            rotation_radians: PI / 2.0, // 90 degrees
+            mirroring: Mirroring::default(),
+            origin: Vector2::new(0.0, 0.0),
+            offset: Vector2::new(0.0, 0.0),
+            scale: 1.0,
+        };
+
+        let transform3 = GerberTransform {
+            rotation_radians: 0.0,
+            mirroring: Mirroring::default(),
+            origin: Vector2::new(0.0, 0.0),
+            offset: Vector2::new(10.0, 10.0),
+            scale: 2.0,
+        };
+
+        // Test point
+        let point = Point2::new(-5.0, 0.0);
+
+        // Apply transforms sequentially
+        let step1 = transform1.apply_to_position(point);
+        let step2 = transform2.apply_to_position(step1);
+        let final_reference = transform3.apply_to_position(step2);
+
+        // Apply combined transforms in steps
+        let combined_1_2 = transform1.combine(&transform2);
+        let combined_all = combined_1_2.combine(&transform3);
+        let final_combined = combined_all.apply_to_position(point);
+
+        // Verify results match
+        assert!((final_combined.x - final_reference.x).abs() < 1e-6);
+        assert!((final_combined.y - final_reference.y).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_rotation_around_different_centers() {
+        // This test specifically targets the original issue
+
+        // Box 1 at (-5, 0)
+        let box1_position = Point2::new(-5.0, 0.0);
+
+        // Box 2 at (5, 0)
+        let box2_position = Point2::new(5.0, 0.0);
+
+        // Local rotations (45°) around each box's position
+        let box1_local_rot = GerberTransform {
+            rotation_radians: PI / 4.0, // 45 degrees
+            mirroring: Mirroring::default(),
+            origin: Vector2::new(-5.0, 0.0), // Rotate around box1's position
+            offset: Vector2::new(0.0, 0.0),
+            scale: 1.0,
+        };
+
+        let box2_local_rot = GerberTransform {
+            rotation_radians: PI / 4.0, // 45 degrees
+            mirroring: Mirroring::default(),
+            origin: Vector2::new(5.0, 0.0), // Rotate around box2's position
+            offset: Vector2::new(0.0, 0.0),
+            scale: 1.0,
+        };
+
+        // Global rotation (90°) around (0, 0)
+        let global_rot = GerberTransform {
+            rotation_radians: PI / 2.0, // 90 degrees
+            mirroring: Mirroring::default(),
+            origin: Vector2::new(0.0, 0.0), // Rotate around the origin
+            offset: Vector2::new(0.0, 0.0),
+            scale: 1.0,
+        };
+
+        // Apply transforms sequentially
+        let box1_after_local = box1_local_rot.apply_to_position(box1_position);
+        let box1_after_global = global_rot.apply_to_position(box1_after_local);
+
+        let box2_after_local = box2_local_rot.apply_to_position(box2_position);
+        let box2_after_global = global_rot.apply_to_position(box2_after_local);
+
+        // Apply combined transforms
+        let box1_combined = box1_local_rot.combine(&global_rot);
+        let box2_combined = box2_local_rot.combine(&global_rot);
+
+        let box1_after_combined = box1_combined.apply_to_position(box1_position);
+        let box2_after_combined = box2_combined.apply_to_position(box2_position);
+
+        println!("Sequential for box1: {:?}", [box1_after_global.x, box1_after_global.y]);
+        println!("Combined for box1: {:?}", [
+            box1_after_combined.x,
+            box1_after_combined.y
+        ]);
+        println!("Sequential for box2: {:?}", [box2_after_global.x, box2_after_global.y]);
+        println!("Combined for box2: {:?}", [
+            box2_after_combined.x,
+            box2_after_combined.y
+        ]);
+
+        println!(
+            "box1_combined: rotation={}, offset={:?}, origin={:?}, scale={}",
+            box1_combined.rotation_radians,
+            [box1_combined.offset.x, box1_combined.offset.y],
+            [box1_combined.origin.x, box1_combined.origin.y],
+            box1_combined.scale
+        );
+
+        println!(
+            "box2_combined: rotation={}, offset={:?}, origin={:?}, scale={}",
+            box2_combined.rotation_radians,
+            [box2_combined.offset.x, box2_combined.offset.y],
+            [box2_combined.origin.x, box2_combined.origin.y],
+            box2_combined.scale
+        );
+
+        // Verify that combined transforms produce the same results as sequential application
+        assert!((box1_after_combined.x - box1_after_global.x).abs() < 1e-6);
+        assert!((box1_after_combined.y - box1_after_global.y).abs() < 1e-6);
+
+        assert!((box2_after_combined.x - box2_after_global.x).abs() < 1e-6);
+        assert!((box2_after_combined.y - box2_after_global.y).abs() < 1e-6);
+
+        // Verify that the boxes end up at the expected positions (~0, -5) and (~0, 5)
+        assert!((box1_after_global.x).abs() < 1e-6);
+        assert!((box1_after_global.y - -5.0).abs() < 1e-6);
+
+        assert!((box2_after_global.x).abs() < 1e-6);
+        assert!((box2_after_global.y - 5.0).abs() < 1e-6);
     }
 }
