@@ -82,25 +82,34 @@ impl GerberTransform {
     /// Apply the transform to a logical `Point2` (Gerber-space)
     #[inline]
     pub fn apply_to_position(&self, pos: Point2<f64>) -> Point2<f64> {
-        let mut x = pos.x - self.origin.x;
-        let mut y = pos.y - self.origin.y;
+        // Adjust for origin
+        let pos_adjusted = Point2::new(
+            pos.x - self.origin.x,
+            pos.y - self.origin.y
+        );
 
-        if self.mirroring.x {
-            x = -x;
-        }
-        if self.mirroring.y {
-            y = -y;
-        }
+        // Apply mirroring
+        let mirrored_x = if self.mirroring.x { -pos_adjusted.x } else { pos_adjusted.x };
+        let mirrored_y = if self.mirroring.y { -pos_adjusted.y } else { pos_adjusted.y };
 
-        // Point2 are in GERBER coordinates, Positive Y = UP so we do a normal rotation
-        let (sin_theta, cos_theta) = (-self.rotation_radians as f64).sin_cos();
-        let rotated_x = x * cos_theta + y * sin_theta;
-        let rotated_y = -x * sin_theta + y * cos_theta;
+        // Apply scale
+        let scaled_x = mirrored_x * self.scale;
+        let scaled_y = mirrored_y * self.scale;
 
+        // Apply rotation (using f64 for calculations)
+        let rotation = self.rotation_radians as f64;
+        let cos_angle = rotation.cos();
+        let sin_angle = rotation.sin();
+
+        let rotated_x = scaled_x * cos_angle - scaled_y * sin_angle;
+        let rotated_y = scaled_x * sin_angle + scaled_y * cos_angle;
+
+        // Apply offset and return
         Point2::new(
-            rotated_x * self.scale + self.origin.x + self.offset.x,
-            rotated_y * self.scale + self.origin.y + self.offset.y,
+            rotated_x + self.offset.x + self.origin.x,
+            rotated_y + self.offset.y + self.origin.y
         )
+
     }
 
     /// Apply transform to a Vec2 instead of Point2 (used for bbox drawing)
