@@ -10,13 +10,14 @@ use super::expressions::{
     evaluate_expression, macro_boolean_to_bool, macro_decimal_pair_to_f64, macro_decimal_to_f64, macro_integer_to_u32,
     ExpressionEvaluationError, MacroContext,
 };
-use super::geometry::{BoundingBox, PolygonMesh};
 use super::gerber_types::{
     Aperture, ApertureDefinition, ApertureMacro, Command, Coordinates, DCode, ExtendedCode, FunctionCode, GCode,
     MacroContent, MacroDecimal, Operation, VariableDefinition,
 };
 use super::spacial::deduplicate::DedupEpsilon;
 use super::{geometry, gerber_types, ToVector};
+use crate::geometry::BoundingBox;
+use crate::geometry::PolygonMesh;
 use crate::types::{Exposure, Winding};
 
 /// FUTURE if the rendering is always real-time, then caching the points at the time the primitives are created would have
