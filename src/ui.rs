@@ -82,6 +82,7 @@ impl UiState {
 pub struct ViewState {
     pub translation: Vec2,
     pub scale: f32,
+    pub base_scale: f32,  // Scale that represents 100% zoom
 }
 
 impl Default for ViewState {
@@ -89,6 +90,7 @@ impl Default for ViewState {
         Self {
             translation: Vec2::ZERO,
             scale: 1.0,
+            base_scale: 1.0,
         }
     }
 }
@@ -123,14 +125,12 @@ impl ViewState {
         let content_height = bbox.height();
 
         // Calculate scale to fit the content (100% zoom)
-        let scale = f32::min(
+        self.base_scale = f32::min(
             viewport.width() / (content_width as f32),
             viewport.height() / (content_height as f32),
-        );
-        // initial zoom factor
-        let scale = scale * initial_zoom_factor;
-        // adjust slightly to add a margin
-        let scale = scale * 0.95;
+        ) * 0.95; // 0.95 to add margin
+
+        let scale = self.base_scale * initial_zoom_factor;
 
         // Compute transformed bounding box
         let outline_vertices: Vec<_> = bbox
@@ -150,5 +150,16 @@ impl ViewState {
         );
 
         self.scale = scale;
+    }
+    
+    pub fn zoom_level_percent(&self) -> f32 {
+        let zoom_level = self.scale / self.base_scale * 100.0;
+        trace!("Zoom level: {:.1}%", zoom_level);
+
+        zoom_level
+    }
+    
+    pub fn set_zoom_level_percent(&mut self, zoom_level: f32) {
+        self.scale = self.base_scale * zoom_level / 100.0;
     }
 }
