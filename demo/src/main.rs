@@ -103,7 +103,7 @@ impl DemoApp {
 
     fn fit_view(&mut self, viewport: Rect) {
         let bbox = self.gerber_layer.bounding_box();
-        self.view_state.fit_view(viewport, bbox, ZOOM_FACTOR, &self.transform);
+        self.view_state.fit_view(viewport, bbox, ZOOM_FACTOR);
         self.needs_view_fitting = false;
     }
 }
