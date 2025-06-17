@@ -541,6 +541,7 @@ pub trait Matrix3Point2Ext {
 }
 
 impl Matrix3Point2Ext for Matrix3<f64> {
+    #[inline]
     fn transform_point2(&self, point: Point2<f64>) -> Point2<f64> {
         // Convert to homogeneous coordinates
         let point_vec = Vector3::new(point.x, point.y, 1.0);
@@ -561,6 +562,7 @@ pub trait Matrix3Pos2Ext {
 }
 
 impl Matrix3Pos2Ext for Matrix3<f64> {
+    #[inline]
     fn transform_pos2(&self, pos: Pos2) -> Vec2 {
         // Convert Pos2 to homogeneous coordinates, flipping Y to match mathematical coordinates
         let point_vec = Vector3::new(pos.x as f64, -(pos.y as f64), 1.0);
