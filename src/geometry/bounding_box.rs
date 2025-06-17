@@ -1,4 +1,4 @@
-use log::debug;
+use log::trace;
 use nalgebra::{Point2, Vector2};
 
 use crate::geometry::transform::GerberTransform;
@@ -61,9 +61,11 @@ impl BoundingBox {
 
         // Step 2: Create a new axis-aligned bbox from transformed points (for viewport fitting)
         let result = BoundingBox::from_points(&transformed_bbox_vertices);
-        debug!(
-            "Applying transform.  transform {:?}: before: {:?}, after: {:?}",
-            transform, self, result
+        trace!(
+            "Applying transform to bbox.  transform {:?}: before: {:?}, after: {:?}",
+            transform,
+            self,
+            result
         );
         result
     }

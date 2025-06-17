@@ -1,6 +1,6 @@
 use egui::{Pos2, Rect, Response, Ui, Vec2};
 use gerber_types::Unit;
-use log::{debug, trace};
+use log::trace;
 use nalgebra::Point2;
 
 use crate::geometry::BoundingBox;
@@ -128,9 +128,12 @@ impl ViewState {
 
         let scale = self.base_scale * initial_zoom_factor;
 
-        debug!(
+        trace!(
             "Fit view. base_scale: {:.2}, scale: {:.2}, content_width: {:.2}, content_height: {:.2}",
-            self.base_scale, scale, content_width, content_height
+            self.base_scale,
+            scale,
+            content_width,
+            content_height
         );
         self.scale = scale;
 
@@ -150,8 +153,6 @@ impl ViewState {
         // Get effective pixels per inch
         let device_ppi = display_info.effective_ppi();
 
-        debug!("Display info: {:?}, effective PPI: {:.2}", display_info, device_ppi);
-
         // Calculate what 100% zoom should be (reference scale)
         let reference_scale = match units {
             Unit::Millimeters => device_ppi / 25.4, // Convert to pixels per mm
@@ -160,9 +161,11 @@ impl ViewState {
 
         // Calculate zoom percentage
         let zoom_level = (self.scale / reference_scale) * 100.0;
-        debug!(
+        trace!(
             "Zoom level: {:.1}%, scale: {:.2}, reference_scale: {:.2}",
-            zoom_level, self.scale, reference_scale
+            zoom_level,
+            self.scale,
+            reference_scale
         );
 
         zoom_level
@@ -180,7 +183,7 @@ impl ViewState {
 
         // Set the scale based on the desired zoom percentage
         self.scale = reference_scale * (zoom_level / 100.0);
-        debug!("Set zoom level to: {:.1}%, new scale: {:.2}", zoom_level, self.scale);
+        trace!("Set zoom level to: {:.1}%, new scale: {:.2}", zoom_level, self.scale);
 
         // Return the actual zoom level (might be different due to rounding)
         self.zoom_level_percent(units, display_info)
