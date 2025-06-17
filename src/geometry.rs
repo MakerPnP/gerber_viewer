@@ -83,42 +83,42 @@ impl GerberTransform {
     pub fn apply_to_position(&self, pos: Point2<f64>) -> Point2<f64> {
         let mut x = pos.x - self.origin.x;
         let mut y = pos.y - self.origin.y;
-    
+
         if self.mirroring.x {
             x = -x;
         }
         if self.mirroring.y {
             y = -y;
         }
-    
+
         // Point2 are in GERBER coordinates, Positive Y = UP so we do a normal rotation
         let (sin_theta, cos_theta) = (-self.rotation_radians as f64).sin_cos();
         let rotated_x = x * cos_theta + y * sin_theta;
         let rotated_y = -x * sin_theta + y * cos_theta;
-    
+
         Point2::new(
             rotated_x * self.scale + self.origin.x + self.offset.x,
             rotated_y * self.scale + self.origin.y + self.offset.y,
         )
     }
-    
+
     /// Apply transform to a Vec2 instead of Point2 (used for bbox drawing)
     pub fn apply_to_pos2(&self, pos: Pos2) -> Vec2 {
         let mut x = pos.x as f64 - self.origin.x;
         let mut y = pos.y as f64 - self.origin.y;
-    
+
         if self.mirroring.x {
             x = -x;
         }
         if self.mirroring.y {
             y = -y;
         }
-    
+
         // Pos 2 are in SCREEN coordinates, Positive Y = DOWN so we need to invert the rotation
         let (sin_theta, cos_theta) = (-self.rotation_radians as f64).sin_cos();
         let rotated_x = x * cos_theta - y * sin_theta;
         let rotated_y = x * sin_theta + y * cos_theta;
-    
+
         Vec2::new(
             (rotated_x * self.scale + self.origin.x + self.offset.x) as f32,
             (rotated_y * self.scale + self.origin.y + self.offset.y) as f32,
@@ -569,6 +569,8 @@ pub trait Matrix3Point2Ext {
 }
 
 impl Matrix3Point2Ext for Matrix3<f64> {
+
+    #[inline]
     fn transform_point2(&self, point: Point2<f64>) -> Point2<f64> {
         // Convert to homogeneous coordinates
         let point_vec = Vector3::new(point.x, point.y, 1.0);
@@ -589,6 +591,7 @@ pub trait Matrix3Pos2Ext {
 }
 
 impl Matrix3Pos2Ext for Matrix3<f64> {
+    #[inline]
     fn transform_pos2(&self, pos: Pos2) -> Vec2 {
         // Convert Pos2 to homogeneous coordinates, flipping Y to match mathematical coordinates
         let point_vec = Vector3::new(pos.x as f64, -(pos.y as f64), 1.0);
@@ -1238,9 +1241,9 @@ impl Matrix3TransformExt for Matrix3<f64> {
         //    [ s,  0,  ty ]
         //    [ 0,  0,   1 ]
         // ```
-        // 
+        //
         // For a pure 270° rotation, the matrix has the form:
-        // ``` 
+        // ```
         //    [  0, s,  tx ]
         //    [ -s, 0,  ty ]
         //    [  0, 0,   1 ]
