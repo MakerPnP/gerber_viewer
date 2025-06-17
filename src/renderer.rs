@@ -5,9 +5,10 @@ use egui::epaint::{
     Color32, ColorMode, FontId, Mesh, PathShape, PathStroke, Pos2, Rect, Shape, Stroke, StrokeKind, Vec2, Vertex,
 };
 use egui::Painter;
+use nalgebra::Matrix3;
 
 use crate::layer::GerberPrimitive;
-use crate::{color, GerberLayer, ViewState};
+use crate::{color, GerberLayer, Matrix3Pos2Ext, Matrix3TransformExt, ViewState};
 use crate::{
     ArcGerberPrimitive, CircleGerberPrimitive, GerberTransform, LineGerberPrimitive, PolygonGerberPrimitive,
     RectangleGerberPrimitive,
@@ -47,8 +48,7 @@ impl GerberRenderer {
         configuration: &RenderConfiguration,
         transform: &GerberTransform,
     ) {
-        // flip the transform Y axis, for screen coordinates
-        let transform = transform.flip_y();
+        let transform_matrix = transform.to_matrix();
 
         for (index, primitive) in layer.primitives().iter().enumerate() {
             let color = match configuration.use_unique_shape_colors {
@@ -63,17 +63,19 @@ impl GerberRenderer {
 
             match primitive {
                 GerberPrimitive::Circle(circle) => {
-                    circle.render(painter, &view, &transform, color, shape_number, configuration)
+                    circle.render(painter, &view, &transform_matrix, color, shape_number, configuration)
                 }
                 GerberPrimitive::Rectangle(rect) => {
-                    rect.render(painter, &view, &transform, color, shape_number, configuration)
+                    rect.render(painter, &view, &transform_matrix, color, shape_number, configuration)
                 }
                 GerberPrimitive::Line(line) => {
-                    line.render(painter, &view, &transform, color, shape_number, configuration)
+                    line.render(painter, &view, &transform_matrix, color, shape_number, configuration)
                 }
-                GerberPrimitive::Arc(arc) => arc.render(painter, &view, &transform, color, shape_number, configuration),
+                GerberPrimitive::Arc(arc) => {
+                    arc.render(painter, &view, &transform_matrix, color, shape_number, configuration)
+                }
                 GerberPrimitive::Polygon(polygon) => {
-                    polygon.render(painter, &view, &transform, color, shape_number, configuration)
+                    polygon.render(painter, &view, &transform_matrix, color, shape_number, configuration)
                 }
             }
         }
@@ -85,7 +87,7 @@ trait Renderable {
         &self,
         painter: &Painter,
         view: &ViewState,
-        transform: &GerberTransform,
+        transform_matrix: &Matrix3<f64>,
         color: Color32,
         shape_number: Option<usize>,
         configuration: &RenderConfiguration,
@@ -98,7 +100,7 @@ impl Renderable for CircleGerberPrimitive {
         &self,
         painter: &Painter,
         view: &ViewState,
-        transform: &GerberTransform,
+        transform_matrix: &Matrix3<f64>,
         color: Color32,
         shape_number: Option<usize>,
         _configuration: &RenderConfiguration,
@@ -113,7 +115,7 @@ impl Renderable for CircleGerberPrimitive {
 
         let screen_center = Pos2::new(center.x as f32, -(center.y as f32));
 
-        let center = view.translation.to_pos2() + transform.apply_to_pos2(screen_center) * view.scale;
+        let center = view.translation.to_pos2() + transform_matrix.transform_pos2(screen_center) * view.scale;
 
         let radius = (*diameter as f32 / 2.0) * view.scale;
         #[cfg(feature = "egui")]
@@ -122,7 +124,7 @@ impl Renderable for CircleGerberPrimitive {
         draw_shape_number(
             painter,
             view,
-            transform,
+            transform_matrix,
             ShapeNumberPosition::Transformed(center),
             shape_number,
         );
@@ -135,7 +137,7 @@ impl Renderable for RectangleGerberPrimitive {
         &self,
         painter: &Painter,
         view: &ViewState,
-        transform: &GerberTransform,
+        transform_matrix: &Matrix3<f64>,
         color: Color32,
         shape_number: Option<usize>,
         _configuration: &RenderConfiguration,
@@ -154,16 +156,9 @@ impl Renderable for RectangleGerberPrimitive {
             origin.x as f32 + *width as f32 / 2.0,     // Add half width to get center
             -(origin.y as f32 + *height as f32 / 2.0), // Flip Y and add half height
         );
-        let center = (view.translation + transform.apply_to_pos2(screen_center) * view.scale).to_pos2();
+        let center = (view.translation + transform_matrix.transform_pos2(screen_center) * view.scale).to_pos2();
 
-        let angle_normalized = transform
-            .rotation_radians
-            .to_degrees()
-            .rem_euclid(360.0);
-        let is_axis_aligned = (angle_normalized - 0.0).abs() < f32::EPSILON
-            || (angle_normalized - 90.0).abs() < f32::EPSILON
-            || (angle_normalized - 180.0).abs() < f32::EPSILON
-            || (angle_normalized - 270.0).abs() < f32::EPSILON;
+        let is_axis_aligned = transform_matrix.is_axis_aligned();
 
         if is_axis_aligned {
             // Fast-path: axis-aligned rectangle (mirroring allowed, since mirroring across axis doesn't affect axis-alignment)
@@ -171,7 +166,8 @@ impl Renderable for RectangleGerberPrimitive {
             let mut width = *width as f32;
             let mut height = *height as f32;
 
-            if (angle_normalized - 90.0).abs() < f32::EPSILON || (angle_normalized - 270.0).abs() < f32::EPSILON {
+            let should_swap = transform_matrix.is_90_or_270_rotation();
+            if should_swap {
                 std::mem::swap(&mut width, &mut height);
             }
 
@@ -201,7 +197,8 @@ impl Renderable for RectangleGerberPrimitive {
             let screen_corners: Vec<Pos2> = corners
                 .iter()
                 .map(|corner| {
-                    (view.translation + transform.apply_to_pos2(screen_center + (*corner).to_vec2()) * view.scale)
+                    (view.translation
+                        + transform_matrix.transform_pos2(screen_center + (*corner).to_vec2()) * view.scale)
                         .to_pos2()
                 })
                 .collect();
@@ -212,7 +209,7 @@ impl Renderable for RectangleGerberPrimitive {
         draw_shape_number(
             painter,
             view,
-            transform,
+            transform_matrix,
             ShapeNumberPosition::Transformed(center),
             shape_number,
         );
@@ -225,7 +222,7 @@ impl Renderable for LineGerberPrimitive {
         &self,
         painter: &Painter,
         view: &ViewState,
-        transform: &GerberTransform,
+        transform_matrix: &Matrix3<f64>,
         color: Color32,
         shape_number: Option<usize>,
         _configuration: &RenderConfiguration,
@@ -242,9 +239,9 @@ impl Renderable for LineGerberPrimitive {
         let end_position = Pos2::new(end.x as f32, -(end.y as f32));
 
         let transformed_start_position =
-            (view.translation + transform.apply_to_pos2(start_position) * view.scale).to_pos2();
+            (view.translation + transform_matrix.transform_pos2(start_position) * view.scale).to_pos2();
         let transformed_end_position =
-            (view.translation + transform.apply_to_pos2(end_position) * view.scale).to_pos2();
+            (view.translation + transform_matrix.transform_pos2(end_position) * view.scale).to_pos2();
 
         painter.line_segment(
             [transformed_start_position, transformed_end_position],
@@ -260,7 +257,7 @@ impl Renderable for LineGerberPrimitive {
             draw_shape_number(
                 painter,
                 view,
-                transform,
+                transform_matrix,
                 ShapeNumberPosition::Transformed(screen_center),
                 shape_number,
             );
@@ -274,7 +271,7 @@ impl Renderable for ArcGerberPrimitive {
         &self,
         painter: &Painter,
         view: &ViewState,
-        transform: &GerberTransform,
+        transform_matrix: &Matrix3<f64>,
         color: Color32,
         shape_number: Option<usize>,
         _configuration: &RenderConfiguration,
@@ -294,7 +291,7 @@ impl Renderable for ArcGerberPrimitive {
             .map(|p| {
                 let local = Vec2::new(p.x as f32, -p.y as f32);
                 let position =
-                    (view.translation + transform.apply_to_pos2(screen_center + local) * view.scale).to_pos2();
+                    (view.translation + transform_matrix.transform_pos2(screen_center + local) * view.scale).to_pos2();
                 position
             })
             .collect::<Vec<_>>();
@@ -319,7 +316,7 @@ impl Renderable for ArcGerberPrimitive {
         draw_shape_number(
             painter,
             view,
-            transform,
+            transform_matrix,
             ShapeNumberPosition::Transformed(center_point),
             shape_number,
         );
@@ -332,7 +329,7 @@ impl Renderable for PolygonGerberPrimitive {
         &self,
         painter: &Painter,
         view: &ViewState,
-        transform: &GerberTransform,
+        transform_matrix: &Matrix3<f64>,
         color: Color32,
         shape_number: Option<usize>,
         configuration: &RenderConfiguration,
@@ -353,8 +350,9 @@ impl Renderable for PolygonGerberPrimitive {
                 .iter()
                 .map(|v| {
                     let local = Vec2::new(v.x as f32, -v.y as f32);
-                    let position =
-                        (view.translation + transform.apply_to_pos2(screen_center + local) * view.scale).to_pos2();
+                    let position = (view.translation
+                        + transform_matrix.transform_pos2(screen_center + local) * view.scale)
+                        .to_pos2();
                     position
                 })
                 .collect();
@@ -367,8 +365,9 @@ impl Renderable for PolygonGerberPrimitive {
                 .iter()
                 .map(|[x, y]| {
                     let local = Vec2::new(*x, -*y); // Flip Y just like convex path
-                    let position =
-                        (view.translation + transform.apply_to_pos2(screen_center + local) * view.scale).to_pos2();
+                    let position = (view.translation
+                        + transform_matrix.transform_pos2(screen_center + local) * view.scale)
+                        .to_pos2();
                     Vertex {
                         pos: position,
                         uv: egui::epaint::WHITE_UV,
@@ -390,8 +389,9 @@ impl Renderable for PolygonGerberPrimitive {
                 .iter()
                 .map(|v| {
                     let local = Vec2::new(v.x as f32, -v.y as f32);
-                    let position =
-                        (view.translation + transform.apply_to_pos2(screen_center + local) * view.scale).to_pos2();
+                    let position = (view.translation
+                        + transform_matrix.transform_pos2(screen_center + local) * view.scale)
+                        .to_pos2();
                     position
                 })
                 .collect();
@@ -410,7 +410,7 @@ impl Renderable for PolygonGerberPrimitive {
         draw_shape_number(
             painter,
             view,
-            transform,
+            transform_matrix,
             ShapeNumberPosition::Untransformed(screen_center),
             shape_number,
         );
@@ -420,7 +420,7 @@ impl Renderable for PolygonGerberPrimitive {
 fn draw_shape_number(
     painter: &Painter,
     view: &ViewState,
-    transform: &GerberTransform,
+    transform_matrix: &Matrix3<f64>,
     position: ShapeNumberPosition,
     shape_number: Option<usize>,
 ) {
@@ -429,7 +429,7 @@ fn draw_shape_number(
     let position = match position {
         ShapeNumberPosition::Transformed(position) => position,
         ShapeNumberPosition::Untransformed(position) => {
-            (view.translation + transform.apply_to_pos2(position) * view.scale).to_pos2()
+            (view.translation + transform_matrix.transform_pos2(position) * view.scale).to_pos2()
         }
     };
     painter.text(
