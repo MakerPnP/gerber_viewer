@@ -1,3 +1,4 @@
+use std::f64::consts::PI;
 use egui::{Pos2, Vec2, Vec2b};
 use log::debug;
 use nalgebra::{Matrix3, Point2, Vector2, Vector3};
@@ -79,50 +80,50 @@ impl Default for GerberTransform {
 
 impl GerberTransform {
     /// Apply the transform to a logical `Point2` (Gerber-space)
-    // pub fn apply_to_position(&self, pos: Point2<f64>) -> Point2<f64> {
-    //     let mut x = pos.x - self.origin.x;
-    //     let mut y = pos.y - self.origin.y;
-    //
-    //     if self.mirroring.x {
-    //         x = -x;
-    //     }
-    //     if self.mirroring.y {
-    //         y = -y;
-    //     }
-    //
-    //     // Point2 are in GERBER coordinates, Positive Y = UP so we do a normal rotation
-    //     let (sin_theta, cos_theta) = (-self.rotation_radians as f64).sin_cos();
-    //     let rotated_x = x * cos_theta + y * sin_theta;
-    //     let rotated_y = -x * sin_theta + y * cos_theta;
-    //
-    //     Point2::new(
-    //         rotated_x * self.scale + self.origin.x + self.offset.x,
-    //         rotated_y * self.scale + self.origin.y + self.offset.y,
-    //     )
-    // }
-    //
-    // /// Apply transform to a Vec2 instead of Point2 (used for bbox drawing)
-    // pub fn apply_to_pos2(&self, pos: Pos2) -> Vec2 {
-    //     let mut x = pos.x as f64 - self.origin.x;
-    //     let mut y = pos.y as f64 - self.origin.y;
-    //
-    //     if self.mirroring.x {
-    //         x = -x;
-    //     }
-    //     if self.mirroring.y {
-    //         y = -y;
-    //     }
-    //
-    //     // Pos 2 are in SCREEN coordinates, Positive Y = DOWN so we need to invert the rotation
-    //     let (sin_theta, cos_theta) = (-self.rotation_radians as f64).sin_cos();
-    //     let rotated_x = x * cos_theta - y * sin_theta;
-    //     let rotated_y = x * sin_theta + y * cos_theta;
-    //
-    //     Vec2::new(
-    //         (rotated_x * self.scale + self.origin.x + self.offset.x) as f32,
-    //         (rotated_y * self.scale + self.origin.y + self.offset.y) as f32,
-    //     )
-    // }
+    pub fn apply_to_position(&self, pos: Point2<f64>) -> Point2<f64> {
+        let mut x = pos.x - self.origin.x;
+        let mut y = pos.y - self.origin.y;
+    
+        if self.mirroring.x {
+            x = -x;
+        }
+        if self.mirroring.y {
+            y = -y;
+        }
+    
+        // Point2 are in GERBER coordinates, Positive Y = UP so we do a normal rotation
+        let (sin_theta, cos_theta) = (-self.rotation_radians as f64).sin_cos();
+        let rotated_x = x * cos_theta + y * sin_theta;
+        let rotated_y = -x * sin_theta + y * cos_theta;
+    
+        Point2::new(
+            rotated_x * self.scale + self.origin.x + self.offset.x,
+            rotated_y * self.scale + self.origin.y + self.offset.y,
+        )
+    }
+    
+    /// Apply transform to a Vec2 instead of Point2 (used for bbox drawing)
+    pub fn apply_to_pos2(&self, pos: Pos2) -> Vec2 {
+        let mut x = pos.x as f64 - self.origin.x;
+        let mut y = pos.y as f64 - self.origin.y;
+    
+        if self.mirroring.x {
+            x = -x;
+        }
+        if self.mirroring.y {
+            y = -y;
+        }
+    
+        // Pos 2 are in SCREEN coordinates, Positive Y = DOWN so we need to invert the rotation
+        let (sin_theta, cos_theta) = (-self.rotation_radians as f64).sin_cos();
+        let rotated_x = x * cos_theta - y * sin_theta;
+        let rotated_y = x * sin_theta + y * cos_theta;
+    
+        Vec2::new(
+            (rotated_x * self.scale + self.origin.x + self.offset.x) as f32,
+            (rotated_y * self.scale + self.origin.y + self.offset.y) as f32,
+        )
+    }
 
     pub fn flip_y(mut self) -> Self {
         self.offset.y = -self.offset.y;
@@ -504,7 +505,7 @@ impl GerberTransform {
 
         // Calculate rotation
         // If det < 0, we have mirroring, so adjust the calculation
-        let mut rotation_radians = if !mirroring_x {
+        let rotation_radians = if !mirroring_x {
             c.atan2(a)
         } else {
             (-c).atan2(-a)
@@ -523,7 +524,7 @@ impl GerberTransform {
     }
 
     /// Applies this transform to a position
-    pub fn apply_to_position(&self, position: Point2<f64>) -> Point2<f64> {
+    pub fn apply_to_position_matrix(&self, position: Point2<f64>) -> Point2<f64> {
         // Convert to homogeneous coordinates
         let point_vec = Vector3::new(position.x, position.y, 1.0);
 
@@ -536,7 +537,7 @@ impl GerberTransform {
     }
 
     /// Apply transform to a Pos2 instead of Point2 (used for bbox drawing)
-    pub fn apply_to_pos2(&self, pos: Pos2) -> Vec2 {
+    pub fn apply_to_pos2_matrix(&self, pos: Pos2) -> Vec2 {
         // Convert from Pos2 (screen coords) to our matrix coordinate system
         // Note: Screen coordinates have positive Y pointing DOWN, so we need to adjust the rotation
 
@@ -561,12 +562,53 @@ impl GerberTransform {
     }
 }
 
+/// Extension trait for transforming Point2<f64> using a Matrix3<f64>
+pub trait Matrix3Point2Ext {
+    /// Apply this matrix transformation to a Point2<f64>
+    fn transform_point2(&self, point: Point2<f64>) -> Point2<f64>;
+}
+
+impl Matrix3Point2Ext for Matrix3<f64> {
+    fn transform_point2(&self, point: Point2<f64>) -> Point2<f64> {
+        // Convert to homogeneous coordinates
+        let point_vec = Vector3::new(point.x, point.y, 1.0);
+
+        // Apply the transformation matrix
+        let transformed = self * point_vec;
+
+        // Convert back from homogeneous coordinates
+        Point2::new(transformed[0], transformed[1])
+    }
+}
+
+/// Extension trait for transforming egui's Pos2 using a Matrix3<f64>
+pub trait Matrix3Pos2Ext {
+    /// Apply this matrix transformation to a Pos2 (screen coordinates)
+    /// Handles the Y-axis difference between mathematical and screen coordinates
+    fn transform_pos2(&self, pos: Pos2) -> Vec2;
+}
+
+impl Matrix3Pos2Ext for Matrix3<f64> {
+    fn transform_pos2(&self, pos: Pos2) -> Vec2 {
+        // Convert Pos2 to homogeneous coordinates, flipping Y to match mathematical coordinates
+        let point_vec = Vector3::new(pos.x as f64, -(pos.y as f64), 1.0);
+
+        // Apply the transformation matrix
+        let transformed = self * point_vec;
+
+        // Convert back to Vec2, flipping Y back to screen coordinates
+        Vec2::new(
+            transformed[0] as f32,
+            -transformed[1] as f32,
+        )
+    }
+}
+
 #[cfg(test)]
 mod transform_tests {
     use super::*;
     use nalgebra::{Point2, Vector2};
     use std::f32::consts::PI;
-    use std::f64::consts::PI as PI64;
 
     #[test]
     fn test_identity_transform_matrix() {
@@ -700,16 +742,16 @@ mod transform_tests {
         };
 
         // Apply transforms to get reference results
-        let box1_transform1 = transform1.apply_to_position(box1_position);
+        let box1_transform1 = transform1.apply_to_position_matrix(box1_position);
         println!("box1_transform1: {:?}", [box1_transform1.x, box1_transform1.y]);
 
-        let box2_transform2 = transform2.apply_to_position(box2_position);
+        let box2_transform2 = transform2.apply_to_position_matrix(box2_position);
         println!("box2_transform2: {:?}", [box2_transform2.x, box2_transform2.y]);
 
-        let box1_final_reference = transform_both.apply_to_position(box1_transform1);
+        let box1_final_reference = transform_both.apply_to_position_matrix(box1_transform1);
         println!("box1_final_reference: {:?}", [box1_final_reference.x, box1_final_reference.y]);
 
-        let box2_final_reference = transform_both.apply_to_position(box2_transform2);
+        let box2_final_reference = transform_both.apply_to_position_matrix(box2_transform2);
         println!("box2_final_reference: {:?}", [box2_final_reference.x, box2_final_reference.y]);
 
         // Create combined transforms using the new matrix-based approach
@@ -717,10 +759,10 @@ mod transform_tests {
         let combined2_matrix = transform2.combine(&transform_both);
 
         // Apply the combined transforms
-        let box1_final_matrix = combined1_matrix.apply_to_position(box1_position);
+        let box1_final_matrix = combined1_matrix.apply_to_position_matrix(box1_position);
         println!("box1_final_matrix: {:?}", [box1_final_matrix.x, box1_final_matrix.y]);
 
-        let box2_final_matrix = combined2_matrix.apply_to_position(box2_position);
+        let box2_final_matrix = combined2_matrix.apply_to_position_matrix(box2_position);
         println!("box2_final_matrix: {:?}", [box2_final_matrix.x, box2_final_matrix.y]);
 
         // Print the combined transforms for debugging
@@ -777,16 +819,16 @@ mod transform_tests {
         };
 
         // Apply transforms sequentially to get reference results
-        let box1_after_local = transform1.apply_to_position(box1_position);
+        let box1_after_local = transform1.apply_to_position_matrix(box1_position);
         println!("Box1 after local rotation: ({:.2}, {:.2})", box1_after_local.x, box1_after_local.y);
 
-        let box2_after_local = transform2.apply_to_position(box2_position);
+        let box2_after_local = transform2.apply_to_position_matrix(box2_position);
         println!("Box2 after local rotation: ({:.2}, {:.2})", box2_after_local.x, box2_after_local.y);
 
-        let box1_final_reference = transform_both.apply_to_position(box1_after_local);
+        let box1_final_reference = transform_both.apply_to_position_matrix(box1_after_local);
         println!("Box1 final position (sequential): ({:.2}, {:.2})", box1_final_reference.x, box1_final_reference.y);
 
-        let box2_final_reference = transform_both.apply_to_position(box2_after_local);
+        let box2_final_reference = transform_both.apply_to_position_matrix(box2_after_local);
         println!("Box2 final position (sequential): ({:.2}, {:.2})", box2_final_reference.x, box2_final_reference.y);
 
         // Create combined transforms using matrix-based approach
@@ -794,10 +836,10 @@ mod transform_tests {
         let combined2 = transform2.combine(&transform_both);
 
         // Apply the combined transforms
-        let box1_final_combined = combined1.apply_to_position(box1_position);
+        let box1_final_combined = combined1.apply_to_position_matrix(box1_position);
         println!("Box1 final position (combined): ({:.2}, {:.2})", box1_final_combined.x, box1_final_combined.y);
 
-        let box2_final_combined = combined2.apply_to_position(box2_position);
+        let box2_final_combined = combined2.apply_to_position_matrix(box2_position);
         println!("Box2 final position (combined): ({:.2}, {:.2})", box2_final_combined.x, box2_final_combined.y);
 
         // Print the combined transforms for debugging
@@ -844,9 +886,9 @@ mod transform_tests {
 
         println!("\nBox1 test points:");
         for (i, point) in test_points1.iter().enumerate() {
-            let after_local = transform1.apply_to_position(*point);
-            let final_pos = transform_both.apply_to_position(after_local);
-            let combined_pos = combined1.apply_to_position(*point);
+            let after_local = transform1.apply_to_position_matrix(*point);
+            let final_pos = transform_both.apply_to_position_matrix(after_local);
+            let combined_pos = combined1.apply_to_position_matrix(*point);
 
             println!("Point {}: Original=({:.2}, {:.2}), Final=({:.2}, {:.2}), Combined=({:.2}, {:.2})",
                      i+1, point.x, point.y, final_pos.x, final_pos.y, combined_pos.x, combined_pos.y);
@@ -858,9 +900,9 @@ mod transform_tests {
 
         println!("\nBox2 test points:");
         for (i, point) in test_points2.iter().enumerate() {
-            let after_local = transform2.apply_to_position(*point);
-            let final_pos = transform_both.apply_to_position(after_local);
-            let combined_pos = combined2.apply_to_position(*point);
+            let after_local = transform2.apply_to_position_matrix(*point);
+            let final_pos = transform_both.apply_to_position_matrix(after_local);
+            let combined_pos = combined2.apply_to_position_matrix(*point);
 
             println!("Point {}: Original=({:.2}, {:.2}), Final=({:.2}, {:.2}), Combined=({:.2}, {:.2})",
                      i+1, point.x, point.y, final_pos.x, final_pos.y, combined_pos.x, combined_pos.y);
@@ -909,12 +951,12 @@ mod transform_tests {
 
         for point in test_points {
             // Apply transforms sequentially
-            let intermediate = transform1.apply_to_position(point);
-            let final_reference = transform2.apply_to_position(intermediate);
+            let intermediate = transform1.apply_to_position_matrix(point);
+            let final_reference = transform2.apply_to_position_matrix(intermediate);
 
             // Apply combined transform
             let combined = transform1.combine(&transform2);
-            let final_combined = combined.apply_to_position(point);
+            let final_combined = combined.apply_to_position_matrix(point);
 
             // Verify results match
             assert!((final_combined.x - final_reference.x).abs() < 1e-6);
@@ -946,12 +988,12 @@ mod transform_tests {
         let point = Point2::new(3.0, 4.0);
 
         // Apply transforms sequentially
-        let intermediate = mirror_x.apply_to_position(point);
-        let final_reference = rotate_45.apply_to_position(intermediate);
+        let intermediate = mirror_x.apply_to_position_matrix(point);
+        let final_reference = rotate_45.apply_to_position_matrix(intermediate);
 
         // Apply combined transform
         let combined = mirror_x.combine(&rotate_45);
-        let final_combined = combined.apply_to_position(point);
+        let final_combined = combined.apply_to_position_matrix(point);
 
         // Verify results match
         assert!((final_combined.x - final_reference.x).abs() < 1e-6);
@@ -985,12 +1027,12 @@ mod transform_tests {
         let point = Point2::new(3.0, 4.0);
 
         // Apply transforms sequentially
-        let intermediate = scale_2x.apply_to_position(point);
-        let final_reference = offset_10_20.apply_to_position(intermediate);
+        let intermediate = scale_2x.apply_to_position_matrix(point);
+        let final_reference = offset_10_20.apply_to_position_matrix(intermediate);
 
         // Apply combined transform
         let combined = scale_2x.combine(&offset_10_20);
-        let final_combined = combined.apply_to_position(point);
+        let final_combined = combined.apply_to_position_matrix(point);
 
         // Verify results match
         assert!((final_combined.x - final_reference.x).abs() < 1e-6);
@@ -1031,14 +1073,14 @@ mod transform_tests {
         let point = Point2::new(-5.0, 0.0);
 
         // Apply transforms sequentially
-        let step1 = transform1.apply_to_position(point);
-        let step2 = transform2.apply_to_position(step1);
-        let final_reference = transform3.apply_to_position(step2);
+        let step1 = transform1.apply_to_position_matrix(point);
+        let step2 = transform2.apply_to_position_matrix(step1);
+        let final_reference = transform3.apply_to_position_matrix(step2);
 
         // Apply combined transforms in steps
         let combined_1_2 = transform1.combine(&transform2);
         let combined_all = combined_1_2.combine(&transform3);
-        let final_combined = combined_all.apply_to_position(point);
+        let final_combined = combined_all.apply_to_position_matrix(point);
 
         // Verify results match
         assert!((final_combined.x - final_reference.x).abs() < 1e-6);
@@ -1082,18 +1124,18 @@ mod transform_tests {
         };
 
         // Apply transforms sequentially
-        let box1_after_local = box1_local_rot.apply_to_position(box1_position);
-        let box1_after_global = global_rot.apply_to_position(box1_after_local);
+        let box1_after_local = box1_local_rot.apply_to_position_matrix(box1_position);
+        let box1_after_global = global_rot.apply_to_position_matrix(box1_after_local);
 
-        let box2_after_local = box2_local_rot.apply_to_position(box2_position);
-        let box2_after_global = global_rot.apply_to_position(box2_after_local);
+        let box2_after_local = box2_local_rot.apply_to_position_matrix(box2_position);
+        let box2_after_global = global_rot.apply_to_position_matrix(box2_after_local);
 
         // Apply combined transforms
         let box1_combined = box1_local_rot.combine(&global_rot);
         let box2_combined = box2_local_rot.combine(&global_rot);
 
-        let box1_after_combined = box1_combined.apply_to_position(box1_position);
-        let box2_after_combined = box2_combined.apply_to_position(box2_position);
+        let box1_after_combined = box1_combined.apply_to_position_matrix(box1_position);
+        let box2_after_combined = box2_combined.apply_to_position_matrix(box2_position);
 
         println!("Sequential for box1: {:?}", [box1_after_global.x, box1_after_global.y]);
         println!("Combined for box1: {:?}", [box1_after_combined.x, box1_after_combined.y]);
@@ -1126,4 +1168,178 @@ mod transform_tests {
         assert!((box2_after_global.x).abs() < 1e-6);
         assert!((box2_after_global.y - 5.0).abs() < 1e-6);
     }
+}
+
+
+/// Extension trait for checking properties of a Matrix3<f64> transformation
+pub trait Matrix3TransformExt {
+    /// Check if this transformation matrix represents an axis-aligned transform
+    /// (rotations of only 0, 90, 180, or 270 degrees)
+    fn is_axis_aligned(&self) -> bool;
+
+    /// Extract the rotation angle from the transformation matrix in radians
+    fn extract_rotation_angle(&self) -> f64;
+
+    /// Check if this transformation matrix represents a 90° or 270° rotation
+    /// (optionally with uniform scaling)
+    fn is_90_or_270_rotation(&self) -> bool;
+    fn is_0_or_180_rotation(&self) -> bool;
+
+    fn get_axis_aligned_angle(&self) -> Option<i32>;
+}
+
+impl Matrix3TransformExt for Matrix3<f64> {
+    fn is_axis_aligned(&self) -> bool {
+        // Extract the 2x2 rotation/scaling matrix
+        let a = self[(0, 0)];
+        let b = self[(0, 1)];
+        let c = self[(1, 0)];
+        let d = self[(1, 1)];
+
+        // For axis-aligned transforms, either:
+        // 1. a and d are non-zero, b and c are close to zero (0° or 180° rotation)
+        // 2. b and c are non-zero, a and d are close to zero (90° or 270° rotation)
+
+        // Check first case: close to 0° or 180° rotation
+        let case1 = (b.abs() < f64::EPSILON && c.abs() < f64::EPSILON) &&
+            (a.abs() > f64::EPSILON || d.abs() > f64::EPSILON);
+
+        // Check second case: close to 90° or 270° rotation
+        let case2 = (a.abs() < f64::EPSILON && d.abs() < f64::EPSILON) &&
+            (b.abs() > f64::EPSILON || c.abs() > f64::EPSILON);
+
+        // Check if matrix represents one of these cases
+        case1 || case2
+    }
+
+    fn extract_rotation_angle(&self) -> f64 {
+        // Extract the 2x2 rotation/scaling matrix
+        let a = self[(0, 0)];
+        let b = self[(0, 1)];
+        let c = self[(1, 0)];
+        let d = self[(1, 1)];
+
+        // Handle scale factors by normalizing the matrix elements
+        let det = (a * d - b * c).sqrt();
+        let a_norm = if det.abs() > f64::EPSILON { a / det } else { a };
+        let b_norm = if det.abs() > f64::EPSILON { b / det } else { b };
+
+        // Calculate rotation angle (account for possible reflections)
+        let angle = b_norm.atan2(a_norm);
+
+        // Normalize to [0, 2π)
+        (angle + 2.0 * PI) % (2.0 * PI)
+    }
+
+    fn is_90_or_270_rotation(&self) -> bool {
+        // For a pure 90° rotation, the matrix has the form:
+        // ```
+        //    [ 0, -s,  tx ]
+        //    [ s,  0,  ty ]
+        //    [ 0,  0,   1 ]
+        // ```
+        // 
+        // For a pure 270° rotation, the matrix has the form:
+        // ``` 
+        //    [  0, s,  tx ]
+        //    [ -s, 0,  ty ]
+        //    [  0, 0,   1 ]
+        // ```
+
+        // Extract the 2x2 rotation/scaling matrix
+        let a = self[(0, 0)];
+        let b = self[(0, 1)];
+        let c = self[(1, 0)];
+        let d = self[(1, 1)];
+
+        // For a 90° or 270° rotation (with possible uniform scaling):
+        // 1. The diagonal elements (a and d) should be close to zero
+        // 2. The off-diagonal elements (b and c) should have opposite signs
+        // 3. |b| should be approximately equal to |c| (accounting for uniform scaling)
+
+        // Check if diagonal elements are approximately zero
+        let diagonals_are_zero = a.abs() < f64::EPSILON && d.abs() < f64::EPSILON;
+
+        // Check if off-diagonal elements are non-zero and have opposite signs
+        let off_diagonals_opposite_sign = (b * c) < 0.0 &&
+            b.abs() > f64::EPSILON &&
+            c.abs() > f64::EPSILON;
+
+        // Check if the magnitude of off-diagonal elements is approximately equal
+        // (allowing for some numerical error)
+        let relative_diff = if c.abs() > f64::EPSILON {
+            (b.abs() / c.abs() - 1.0).abs()
+        } else {
+            f64::INFINITY
+        };
+        let magnitudes_equal = relative_diff < 1e-6;
+
+        // All conditions must be true
+        diagonals_are_zero && off_diagonals_opposite_sign && magnitudes_equal
+    }
+
+    fn is_0_or_180_rotation(&self) -> bool {
+        // Extract the 2x2 rotation/scaling matrix
+        let a = self[(0, 0)];
+        let b = self[(0, 1)];
+        let c = self[(1, 0)];
+        let d = self[(1, 1)];
+
+        // For a 0° or 180° rotation (with possible uniform scaling):
+        // 1. The off-diagonal elements (b and c) should be close to zero
+        // 2. The diagonal elements (a and d) should have the same sign for 0°
+        //    or opposite signs for 180°
+        // 3. |a| should be approximately equal to |d| (accounting for uniform scaling)
+
+        // Check if off-diagonal elements are approximately zero
+        let off_diagonals_are_zero = b.abs() < f64::EPSILON && c.abs() < f64::EPSILON;
+
+        // Check if diagonal elements are non-zero
+        let diagonals_are_nonzero = a.abs() > f64::EPSILON && d.abs() > f64::EPSILON;
+
+        // Check if the magnitude of diagonal elements is approximately equal
+        let relative_diff = if d.abs() > f64::EPSILON {
+            (a.abs() / d.abs() - 1.0).abs()
+        } else {
+            f64::INFINITY
+        };
+        let magnitudes_equal = relative_diff < 1e-6;
+
+        // All conditions must be true
+        off_diagonals_are_zero && diagonals_are_nonzero && magnitudes_equal
+    }
+
+    /// Determine the axis-aligned rotation angle (0°, 90°, 180°, or 270°)
+    /// Returns None if the matrix is not an axis-aligned rotation
+    fn get_axis_aligned_angle(&self) -> Option<i32> {
+        if self.is_0_or_180_rotation() {
+            // Determine if it's 0° or 180° by checking the sign of diagonal elements
+            let a = self[(0, 0)];
+            let d = self[(1, 1)];
+
+            // Same sign indicates 0°, opposite sign indicates 180°
+            if a * d > 0.0 {
+                Some(0)
+            } else {
+                Some(180)
+            }
+        } else if self.is_90_or_270_rotation() {
+            // Determine if it's 90° or 270° by checking the sign of off-diagonal elements
+            let b = self[(0, 1)];
+            let c = self[(1, 0)];
+
+            // For standard rotation matrices:
+            // 90° rotation has b < 0 and c > 0
+            // 270° rotation has b > 0 and c < 0
+            if b < 0.0 && c > 0.0 {
+                Some(90)
+            } else {
+                Some(270)
+            }
+        } else {
+            None
+        }
+    }
+
+
 }

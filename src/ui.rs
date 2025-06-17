@@ -3,7 +3,7 @@ use gerber_types::Unit;
 use log::{trace, debug};
 use nalgebra::Point2;
 
-use crate::{BoundingBox, GerberTransform, Invert, ToPos2};
+use crate::{BoundingBox, Invert, ToPos2};
 
 #[derive(Debug, Default)]
 pub struct UiState {
