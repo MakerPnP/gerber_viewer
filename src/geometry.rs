@@ -92,22 +92,18 @@ impl GerberTransform {
         let mirrored_x = if self.mirroring.x { -pos_adjusted.x } else { pos_adjusted.x };
         let mirrored_y = if self.mirroring.y { -pos_adjusted.y } else { pos_adjusted.y };
 
-        // Apply scale
-        let scaled_x = mirrored_x * self.scale;
-        let scaled_y = mirrored_y * self.scale;
-
         // Apply rotation (using f64 for calculations)
         let rotation = self.rotation_radians as f64;
         let cos_angle = rotation.cos();
         let sin_angle = rotation.sin();
 
-        let rotated_x = scaled_x * cos_angle - scaled_y * sin_angle;
-        let rotated_y = scaled_x * sin_angle + scaled_y * cos_angle;
+        let rotated_x = (mirrored_x * cos_angle - mirrored_y * sin_angle);
+        let rotated_y = (mirrored_x * sin_angle + mirrored_y * cos_angle);
 
-        // Apply offset and return
+        // Apply scale and offset
         Point2::new(
-            rotated_x + self.offset.x + self.origin.x,
-            rotated_y + self.offset.y + self.origin.y
+            rotated_x * self.scale + self.offset.x + self.origin.x,
+            rotated_y * self.scale + self.offset.y + self.origin.y
         )
 
     }
