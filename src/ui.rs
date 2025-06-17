@@ -1,5 +1,6 @@
 use egui::{Pos2, Rect, Response, Ui, Vec2};
-use log::trace;
+use gerber_types::Unit;
+use log::{debug, trace};
 use nalgebra::Point2;
 
 use crate::{BoundingBox, GerberTransform, Invert, ToPos2};
@@ -114,7 +115,7 @@ impl ViewState {
     /// the initial transform.
     ///
     /// often you'll want to reset the `transform` before calling this.
-    pub fn reset_view(
+    pub fn fit_view(
         &mut self,
         viewport: Rect,
         bbox: &BoundingBox,
@@ -132,27 +133,114 @@ impl ViewState {
 
         let scale = self.base_scale * initial_zoom_factor;
 
+        debug!(
+            "Fit view. base_scale: {:.2}, scale: {:.2}, content_width: {:.2}, content_height: {:.2}",
+            self.base_scale, scale, content_width, content_height
+        );
+        self.scale = scale;
+
+        self.center_view(viewport, bbox, transform);
+    }
+
+    pub fn center_view(&mut self, viewport: Rect, bbox: &BoundingBox, transform: &GerberTransform) {
         let transformed_bbox = bbox.apply_transform(transform);
 
         // Use the center of the transformed bounding box
         let transformed_center = transformed_bbox.center();
 
         self.translation = Vec2::new(
-            viewport.center().x - (transformed_center.x as f32 * scale),
-            viewport.center().y + (transformed_center.y as f32 * scale),
+            viewport.center().x - (transformed_center.x as f32 * self.scale),
+            viewport.center().y + (transformed_center.y as f32 * self.scale),
         );
-
-        self.scale = scale;
     }
 
-    pub fn zoom_level_percent(&self) -> f32 {
-        let zoom_level = self.scale / self.base_scale * 100.0;
-        trace!("Zoom level: {:.1}%", zoom_level);
+    pub fn zoom_level_percent(&self, units: Unit, display_info: &DisplayInfo) -> f32 {
+        // Get effective pixels per inch
+        let device_ppi = display_info.effective_ppi();
+
+        debug!("Display info: {:?}, effective PPI: {:.2}", display_info, device_ppi);
+
+        // Calculate what 100% zoom should be (reference scale)
+        let reference_scale = match units {
+            Unit::Millimeters => device_ppi / 25.4, // Convert to pixels per mm
+            Unit::Inches => device_ppi,             // pixels per inch
+        };
+
+        // Calculate zoom percentage
+        let zoom_level = (self.scale / reference_scale) * 100.0;
+        debug!(
+            "Zoom level: {:.1}%, scale: {:.2}, reference_scale: {:.2}",
+            zoom_level, self.scale, reference_scale
+        );
 
         zoom_level
     }
 
-    pub fn set_zoom_level_percent(&mut self, zoom_level: f32) {
-        self.scale = self.base_scale * zoom_level / 100.0;
+    pub fn set_zoom_level_percent(&mut self, zoom_level: f32, units: Unit, display_info: &DisplayInfo) -> f32 {
+        // Get effective pixels per inch
+        let device_ppi = display_info.effective_ppi();
+
+        // Calculate the reference scale for 100% zoom
+        let reference_scale = match units {
+            Unit::Millimeters => device_ppi / 25.4, // Convert to pixels per mm
+            Unit::Inches => device_ppi,             // pixels per inch
+        };
+
+        // Set the scale based on the desired zoom percentage
+        self.scale = reference_scale * (zoom_level / 100.0);
+        debug!("Set zoom level to: {:.1}%, new scale: {:.2}", zoom_level, self.scale);
+
+        // Return the actual zoom level (might be different due to rounding)
+        self.zoom_level_percent(units, display_info)
+    }
+}
+
+/// Struct to hold display information including DPI values
+#[derive(Debug, Clone, Copy)]
+pub struct DisplayInfo {
+    /// DPI along the horizontal axis (pixels per inch)
+    pub dpi_x: f32,
+    /// DPI along the vertical axis (pixels per inch)
+    pub dpi_y: f32,
+    /// UI scaling factor from egui
+    pub pixels_per_point: f32,
+}
+
+impl DisplayInfo {
+    /// Create a new DisplayInfo with default values
+    pub fn new() -> Self {
+        Self {
+            dpi_x: 96.0,
+            dpi_y: 96.0,
+            pixels_per_point: 1.0,
+        }
+    }
+
+    pub fn with_dpi(self, dpi_x: f32, dpi_y: f32) -> Self {
+        Self {
+            dpi_x,
+            dpi_y,
+            ..self
+        }
+    }
+
+    /// Get the average DPI
+    pub fn average_dpi(&self) -> f32 {
+        (self.dpi_x + self.dpi_y) / 2.0
+    }
+
+    /// Get effective pixels per inch, accounting for UI scaling
+    pub fn effective_ppi(&self) -> f32 {
+        self.average_dpi() * self.pixels_per_point
+    }
+
+    /// Update the DisplayInfo with current system values
+    pub fn update_ppi_from_system(&mut self) {
+        self.pixels_per_point = egui::Context::default().pixels_per_point();
+    }
+
+    pub fn set_dpi(&mut self, dpi_x: f32, dpi_y: f32) {
+        self.dpi_x = dpi_x;
+        self.dpi_y = dpi_y;
     }
 }

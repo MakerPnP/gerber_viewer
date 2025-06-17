@@ -34,7 +34,7 @@ struct DemoApp {
     renderer_configuration: RenderConfiguration,
     view_state: ViewState,
     ui_state: UiState,
-    needs_initial_view: bool,
+    needs_view_fitting: bool,
     transform: GerberTransform,
     last_frame_time: std::time::Instant,
 }
@@ -95,19 +95,16 @@ impl DemoApp {
             renderer_configuration: renderer_config,
             view_state: Default::default(),
             ui_state: Default::default(),
-            needs_initial_view: true,
+            needs_view_fitting: true,
             transform,
             last_frame_time: std::time::Instant::now(),
         }
     }
 
-    fn reset_view(&mut self, viewport: Rect) {
+    fn fit_view(&mut self, viewport: Rect) {
         let bbox = self.gerber_layer.bounding_box();
-        self.view_state.reset_view(viewport, bbox, ZOOM_FACTOR, &self.transform);
-
-        // reset the last frame time again, so that the animation starts from the beginning.
-        self.last_frame_time =  std::time::Instant::now();
-        self.needs_initial_view = false;
+        self.view_state.fit_view(viewport, bbox, ZOOM_FACTOR, &self.transform);
+        self.needs_view_fitting = false;
     }
 }
 
@@ -174,8 +171,8 @@ impl eframe::App for DemoApp {
                 let response = ui.allocate_rect(ui.available_rect_before_wrap(), egui::Sense::drag());
                 let viewport = response.rect;
 
-                if self.needs_initial_view {
-                    self.reset_view(viewport)
+                if self.needs_view_fitting {
+                    self.fit_view(viewport)
                 }
                 
                 //
