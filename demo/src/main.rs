@@ -85,7 +85,7 @@ impl DemoApp {
         let origin = CENTER_OFFSET - DESIGN_OFFSET;
 
         let transform = GerberTransform {
-            rotation_radians: INITIAL_ROTATION,
+            rotation: INITIAL_ROTATION,
             mirroring: MIRRORING.into(),
             origin,
             offset: DESIGN_OFFSET,
@@ -121,7 +121,7 @@ impl eframe::App for DemoApp {
         self.last_frame_time = now;
 
         let rotation_increment = ROTATION_SPEED_DEG_PER_SEC.to_radians() * delta;
-        self.transform.rotation_radians += rotation_increment;
+        self.transform.rotation += rotation_increment;
 
         if ROTATION_SPEED_DEG_PER_SEC > 0.0 {
             // force the UI to refresh every frame for a smooth animation

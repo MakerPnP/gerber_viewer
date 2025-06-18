@@ -13,7 +13,8 @@ use crate::geometry::mirroring::Mirroring;
 /// * Finally an offset is added
 #[derive(Debug, Copy, Clone)]
 pub struct GerberTransform {
-    pub rotation_radians: f32,
+    /// rotation in radians, positive = counter-clockwise
+    pub rotation: f32,
     pub mirroring: Mirroring,
     // origin for rotation and mirroring, in gerber coordinates
     pub origin: Vector2<f64>,
@@ -26,7 +27,7 @@ pub struct GerberTransform {
 impl Default for GerberTransform {
     fn default() -> Self {
         Self {
-            rotation_radians: 0.0,
+            rotation: 0.0,
             mirroring: Mirroring::default(),
             origin: Vector2::new(0.0, 0.0),
             offset: Vector2::new(0.0, 0.0),
@@ -55,7 +56,7 @@ impl GerberTransform {
         };
 
         // Apply rotation (using f64 for calculations)
-        let rotation = self.rotation_radians as f64;
+        let rotation = self.rotation as f64;
         let cos_angle = rotation.cos();
         let sin_angle = rotation.sin();
 
@@ -83,7 +84,7 @@ impl GerberTransform {
         }
 
         // Pos 2 are in SCREEN coordinates, Positive Y = DOWN so we need to invert the rotation
-        let (sin_theta, cos_theta) = (-self.rotation_radians as f64).sin_cos();
+        let (sin_theta, cos_theta) = (-self.rotation as f64).sin_cos();
         let rotated_x = x * cos_theta - y * sin_theta;
         let rotated_y = x * sin_theta + y * cos_theta;
 
@@ -110,7 +111,7 @@ impl GerberTransform {
         let translate_neg_origin = Matrix3::new(1.0, 0.0, -self.origin.x, 0.0, 1.0, -self.origin.y, 0.0, 0.0, 1.0);
 
         // Step 2: Apply rotation
-        let rad = self.rotation_radians as f64;
+        let rad = self.rotation as f64;
         let cos_rad = rad.cos();
         let sin_rad = rad.sin();
         let rotation_matrix = Matrix3::new(cos_rad, -sin_rad, 0.0, sin_rad, cos_rad, 0.0, 0.0, 0.0, 1.0);
@@ -179,7 +180,7 @@ impl GerberTransform {
         // This is because we've already incorporated the original origins
         // into the combined matrix
         Self {
-            rotation_radians,
+            rotation: rotation_radians,
             mirroring: Mirroring {
                 x: mirroring_x,
                 y: mirroring_y,
@@ -214,7 +215,7 @@ impl GerberTransform {
 
         // Create a transform that has the rotation direction inverted
         let mut screen_transform = self.clone();
-        screen_transform.rotation_radians = -self.rotation_radians;
+        screen_transform.rotation = -self.rotation;
 
         // Get the transformation matrix
         let matrix = screen_transform.to_matrix();
@@ -285,7 +286,7 @@ mod transform_tests {
     #[test]
     fn test_identity_transform_matrix() {
         let identity = GerberTransform {
-            rotation_radians: 0.0,
+            rotation: 0.0,
             mirroring: Mirroring::default(),
             origin: Vector2::new(0.0, 0.0),
             offset: Vector2::new(0.0, 0.0),
@@ -309,7 +310,7 @@ mod transform_tests {
 
         // Converting back should give us the same transform
         let reconstructed = GerberTransform::from_matrix(&matrix);
-        assert!((reconstructed.rotation_radians - 0.0).abs() < 1e-6);
+        assert!((reconstructed.rotation - 0.0).abs() < 1e-6);
         assert_eq!(reconstructed.mirroring.x, false);
         assert_eq!(reconstructed.mirroring.y, false);
         assert!((reconstructed.origin.x - 0.0).abs() < 1e-6);
@@ -322,7 +323,7 @@ mod transform_tests {
     #[test]
     fn test_rotation_transform_matrix() {
         let rotation_90 = GerberTransform {
-            rotation_radians: PI / 2.0, // 90 degrees
+            rotation: PI / 2.0, // 90 degrees
             mirroring: Mirroring::default(),
             origin: Vector2::new(0.0, 0.0),
             offset: Vector2::new(0.0, 0.0),
@@ -343,7 +344,7 @@ mod transform_tests {
 
         // Converting back should give us the same transform
         let reconstructed = GerberTransform::from_matrix(&matrix);
-        assert!((reconstructed.rotation_radians - PI / 2.0).abs() < 1e-6);
+        assert!((reconstructed.rotation - PI / 2.0).abs() < 1e-6);
         assert_eq!(reconstructed.mirroring.x, false);
         assert!((reconstructed.scale - 1.0).abs() < 1e-6);
     }
@@ -351,7 +352,7 @@ mod transform_tests {
     #[test]
     fn test_offset_transform_matrix() {
         let offset_transform = GerberTransform {
-            rotation_radians: 0.0,
+            rotation: 0.0,
             mirroring: Mirroring::default(),
             origin: Vector2::new(0.0, 0.0),
             offset: Vector2::new(10.0, 20.0),
@@ -372,7 +373,7 @@ mod transform_tests {
 
         // Converting back should give us the same transform
         let reconstructed = GerberTransform::from_matrix(&matrix);
-        assert!((reconstructed.rotation_radians - 0.0).abs() < 1e-6);
+        assert!((reconstructed.rotation - 0.0).abs() < 1e-6);
         assert_eq!(reconstructed.mirroring.x, false);
         assert!((reconstructed.offset.x - 10.0).abs() < 1e-6);
         assert!((reconstructed.offset.y - 20.0).abs() < 1e-6);
@@ -389,7 +390,7 @@ mod transform_tests {
 
         // Step 1: Create individual 45-degree rotation transforms for each box
         let transform1 = GerberTransform {
-            rotation_radians: PI / 4.0, // 45 degrees
+            rotation: PI / 4.0, // 45 degrees
             mirroring: Mirroring::default(),
             origin: Vector2::new(-5.0, 0.0), // Rotate around box1's position
             offset: Vector2::new(0.0, 0.0),
@@ -397,7 +398,7 @@ mod transform_tests {
         };
 
         let transform2 = GerberTransform {
-            rotation_radians: PI / 4.0, // 45 degrees
+            rotation: PI / 4.0, // 45 degrees
             mirroring: Mirroring::default(),
             origin: Vector2::new(5.0, 0.0), // Rotate around box2's position
             offset: Vector2::new(0.0, 0.0),
@@ -406,7 +407,7 @@ mod transform_tests {
 
         // Step 2: Create a 90-degree rotation transform around (0, 0) for both boxes
         let transform_both = GerberTransform {
-            rotation_radians: PI / 2.0, // 90 degrees
+            rotation: PI / 2.0, // 90 degrees
             mirroring: Mirroring::default(),
             origin: Vector2::new(0.0, 0.0), // Rotate around the origin
             offset: Vector2::new(0.0, 0.0),
@@ -446,7 +447,7 @@ mod transform_tests {
         // Print the combined transforms for debugging
         println!(
             "combined1_matrix: rotation={}, offset={:?}, origin={:?}, scale={}",
-            combined1_matrix.rotation_radians,
+            combined1_matrix.rotation,
             [combined1_matrix.offset.x, combined1_matrix.offset.y],
             [combined1_matrix.origin.x, combined1_matrix.origin.y],
             combined1_matrix.scale
@@ -454,7 +455,7 @@ mod transform_tests {
 
         println!(
             "combined2_matrix: rotation={}, offset={:?}, origin={:?}, scale={}",
-            combined2_matrix.rotation_radians,
+            combined2_matrix.rotation,
             [combined2_matrix.offset.x, combined2_matrix.offset.y],
             [combined2_matrix.origin.x, combined2_matrix.origin.y],
             combined2_matrix.scale
@@ -476,7 +477,7 @@ mod transform_tests {
 
         // Step 1: Create individual 45-degree rotation transforms for each box
         let transform1 = GerberTransform {
-            rotation_radians: PI / 4.0, // 45 degrees
+            rotation: PI / 4.0, // 45 degrees
             mirroring: Mirroring::default(),
             origin: Vector2::new(-5.0, -5.0), // Rotate around box1's position
             offset: Vector2::new(0.0, 0.0),
@@ -484,7 +485,7 @@ mod transform_tests {
         };
 
         let transform2 = GerberTransform {
-            rotation_radians: PI / 4.0, // 45 degrees
+            rotation: PI / 4.0, // 45 degrees
             mirroring: Mirroring::default(),
             origin: Vector2::new(-5.0, 5.0), // Rotate around box2's position
             offset: Vector2::new(0.0, 0.0),
@@ -493,7 +494,7 @@ mod transform_tests {
 
         // Step 2: Create a 90-degree rotation transform around (0, 0) for both boxes
         let transform_both = GerberTransform {
-            rotation_radians: PI / 2.0, // 90 degrees
+            rotation: PI / 2.0, // 90 degrees
             mirroring: Mirroring::default(),
             origin: Vector2::new(0.0, 0.0), // Rotate around the origin
             offset: Vector2::new(0.0, 0.0),
@@ -544,13 +545,13 @@ mod transform_tests {
 
         // Print the combined transforms for debugging
         println!("Combined transform for Box1: rotation={:.2} degrees, offset=({:.2}, {:.2}), origin=({:.2}, {:.2}), scale={:.2}",
-                 combined1.rotation_radians * 180.0 / PI as f32,
+                 combined1.rotation * 180.0 / PI as f32,
                  combined1.offset.x, combined1.offset.y,
                  combined1.origin.x, combined1.origin.y,
                  combined1.scale);
 
         println!("Combined transform for Box2: rotation={:.2} degrees, offset=({:.2}, {:.2}), origin=({:.2}, {:.2}), scale={:.2}",
-                 combined2.rotation_radians * 180.0 / PI as f32,
+                 combined2.rotation * 180.0 / PI as f32,
                  combined2.offset.x, combined2.offset.y,
                  combined2.origin.x, combined2.origin.y,
                  combined2.scale);
@@ -642,7 +643,7 @@ mod transform_tests {
     fn test_combined_transforms_complex() {
         // Test a more complex scenario with rotation, scaling, and offset
         let transform1 = GerberTransform {
-            rotation_radians: PI / 6.0, // 30 degrees
+            rotation: PI / 6.0, // 30 degrees
             mirroring: Mirroring::default(),
             origin: Vector2::new(3.0, 4.0),
             offset: Vector2::new(1.0, 2.0),
@@ -650,7 +651,7 @@ mod transform_tests {
         };
 
         let transform2 = GerberTransform {
-            rotation_radians: PI / 3.0, // 60 degrees
+            rotation: PI / 3.0, // 60 degrees
             mirroring: Mirroring::default(),
             origin: Vector2::new(-2.0, 5.0),
             offset: Vector2::new(3.0, -1.0),
@@ -684,7 +685,7 @@ mod transform_tests {
     fn test_mirroring_transforms() {
         // Create transform with x-mirroring
         let mirror_x = GerberTransform {
-            rotation_radians: 0.0,
+            rotation: 0.0,
             mirroring: Mirroring {
                 x: true,
                 y: false,
@@ -696,7 +697,7 @@ mod transform_tests {
 
         // Create a rotation transform
         let rotate_45 = GerberTransform {
-            rotation_radians: PI / 4.0, // 45 degrees
+            rotation: PI / 4.0, // 45 degrees
             mirroring: Mirroring::default(),
             origin: Vector2::new(0.0, 0.0),
             offset: Vector2::new(0.0, 0.0),
@@ -726,7 +727,7 @@ mod transform_tests {
     fn test_scaling_transforms() {
         // Create transform with scaling
         let scale_2x = GerberTransform {
-            rotation_radians: 0.0,
+            rotation: 0.0,
             mirroring: Mirroring::default(),
             origin: Vector2::new(0.0, 0.0),
             offset: Vector2::new(0.0, 0.0),
@@ -735,7 +736,7 @@ mod transform_tests {
 
         // Create transform with offset
         let offset_10_20 = GerberTransform {
-            rotation_radians: 0.0,
+            rotation: 0.0,
             mirroring: Mirroring::default(),
             origin: Vector2::new(0.0, 0.0),
             offset: Vector2::new(10.0, 20.0),
@@ -765,7 +766,7 @@ mod transform_tests {
     fn test_multiple_combined_transforms() {
         // Create three transforms
         let transform1 = GerberTransform {
-            rotation_radians: PI / 4.0, // 45 degrees
+            rotation: PI / 4.0, // 45 degrees
             mirroring: Mirroring::default(),
             origin: Vector2::new(-5.0, 0.0),
             offset: Vector2::new(0.0, 0.0),
@@ -773,7 +774,7 @@ mod transform_tests {
         };
 
         let transform2 = GerberTransform {
-            rotation_radians: PI / 2.0, // 90 degrees
+            rotation: PI / 2.0, // 90 degrees
             mirroring: Mirroring::default(),
             origin: Vector2::new(0.0, 0.0),
             offset: Vector2::new(0.0, 0.0),
@@ -781,7 +782,7 @@ mod transform_tests {
         };
 
         let transform3 = GerberTransform {
-            rotation_radians: 0.0,
+            rotation: 0.0,
             mirroring: Mirroring::default(),
             origin: Vector2::new(0.0, 0.0),
             offset: Vector2::new(10.0, 10.0),
@@ -818,7 +819,7 @@ mod transform_tests {
 
         // Local rotations (45°) around each box's position
         let box1_local_rot = GerberTransform {
-            rotation_radians: PI / 4.0, // 45 degrees
+            rotation: PI / 4.0, // 45 degrees
             mirroring: Mirroring::default(),
             origin: Vector2::new(-5.0, 0.0), // Rotate around box1's position
             offset: Vector2::new(0.0, 0.0),
@@ -826,7 +827,7 @@ mod transform_tests {
         };
 
         let box2_local_rot = GerberTransform {
-            rotation_radians: PI / 4.0, // 45 degrees
+            rotation: PI / 4.0, // 45 degrees
             mirroring: Mirroring::default(),
             origin: Vector2::new(5.0, 0.0), // Rotate around box2's position
             offset: Vector2::new(0.0, 0.0),
@@ -835,7 +836,7 @@ mod transform_tests {
 
         // Global rotation (90°) around (0, 0)
         let global_rot = GerberTransform {
-            rotation_radians: PI / 2.0, // 90 degrees
+            rotation: PI / 2.0, // 90 degrees
             mirroring: Mirroring::default(),
             origin: Vector2::new(0.0, 0.0), // Rotate around the origin
             offset: Vector2::new(0.0, 0.0),
@@ -869,7 +870,7 @@ mod transform_tests {
 
         println!(
             "box1_combined: rotation={}, offset={:?}, origin={:?}, scale={}",
-            box1_combined.rotation_radians,
+            box1_combined.rotation,
             [box1_combined.offset.x, box1_combined.offset.y],
             [box1_combined.origin.x, box1_combined.origin.y],
             box1_combined.scale
@@ -877,7 +878,7 @@ mod transform_tests {
 
         println!(
             "box2_combined: rotation={}, offset={:?}, origin={:?}, scale={}",
-            box2_combined.rotation_radians,
+            box2_combined.rotation,
             [box2_combined.offset.x, box2_combined.offset.y],
             [box2_combined.origin.x, box2_combined.origin.y],
             box2_combined.scale

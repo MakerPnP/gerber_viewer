@@ -40,7 +40,7 @@ fn benchmark_transforms(c: &mut Criterion) {
 
     // Create a GerberTransform with similar properties
     let gerber_transform = GerberTransform {
-        rotation_radians: transform.rotation as f32,
+        rotation: transform.rotation as f32,
         mirroring: [false, false].into(),
         origin: Vector2::new(0.0, 0.0),
         offset: Vector2::new(transform.translation_x, transform.translation_y),

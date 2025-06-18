@@ -87,6 +87,7 @@ impl BoundingBox {
     }
 
     /// Returns a new bounding box rotated around origin (0, 0) by given angle in radians.
+    /// positive = counter-clockwise
     pub fn apply_rotation(&self, radians: f64, offset: Vector2<f64>) -> Self {
         let (sin_theta, cos_theta) = radians.sin_cos();
         let mut corners = self.vertices();
