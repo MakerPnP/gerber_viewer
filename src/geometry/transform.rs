@@ -41,19 +41,10 @@ impl GerberTransform {
     #[inline]
     pub fn apply_to_position(&self, pos: Point2<f64>) -> Point2<f64> {
         // Adjust for origin
-        let pos_adjusted = Point2::new(pos.x - self.origin.x, pos.y - self.origin.y);
+        let pos_adjusted = (pos.x - self.origin.x, pos.y - self.origin.y);
 
         // Apply mirroring
-        let mirrored_x = if self.mirroring.x {
-            -pos_adjusted.x
-        } else {
-            pos_adjusted.x
-        };
-        let mirrored_y = if self.mirroring.y {
-            -pos_adjusted.y
-        } else {
-            pos_adjusted.y
-        };
+        let (mirrored_x, mirrored_y) = self.mirroring * pos_adjusted;
 
         // Apply rotation (using f64 for calculations)
         let rotation = self.rotation as f64;
@@ -73,21 +64,19 @@ impl GerberTransform {
     /// Apply transform to a Vec2 instead of Point2 (used for bbox drawing)
     #[inline]
     pub fn apply_to_pos2(&self, pos: Pos2) -> Vec2 {
-        let mut x = pos.x as f64 - self.origin.x;
-        let mut y = pos.y as f64 - self.origin.y;
+        // Adjust for origin
+        let pos_adjusted = (pos.x as f64 - self.origin.x, pos.y as f64 - self.origin.y);
 
-        if self.mirroring.x {
-            x = -x;
-        }
-        if self.mirroring.y {
-            y = -y;
-        }
+        // Apply mirroring
+        let (mirrored_x, mirrored_y) = self.mirroring * pos_adjusted;
 
+        // Apply rotation (using f64 for calculations)
         // Pos 2 are in SCREEN coordinates, Positive Y = DOWN so we need to invert the rotation
         let (sin_theta, cos_theta) = (-self.rotation as f64).sin_cos();
-        let rotated_x = x * cos_theta - y * sin_theta;
-        let rotated_y = x * sin_theta + y * cos_theta;
+        let rotated_x = mirrored_x * cos_theta - mirrored_y * sin_theta;
+        let rotated_y = mirrored_x * sin_theta + mirrored_y * cos_theta;
 
+        // Apply scale and offset
         Vec2::new(
             (rotated_x * self.scale + self.origin.x + self.offset.x) as f32,
             (rotated_y * self.scale + self.origin.y + self.offset.y) as f32,
@@ -117,8 +106,7 @@ impl GerberTransform {
         let rotation_matrix = Matrix3::new(cos_rad, -sin_rad, 0.0, sin_rad, cos_rad, 0.0, 0.0, 0.0, 1.0);
 
         // Step 3: Apply mirroring (if any)
-        let mirror_x = if self.mirroring.x { -1.0 } else { 1.0 };
-        let mirror_y = if self.mirroring.y { -1.0 } else { 1.0 };
+        let [mirror_x, mirror_y] = self.mirroring.as_f64();
         let mirroring_matrix = Matrix3::new(mirror_x, 0.0, 0.0, 0.0, mirror_y, 0.0, 0.0, 0.0, 1.0);
 
         // Step 4: Apply scaling
